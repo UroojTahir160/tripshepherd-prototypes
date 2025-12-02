@@ -2,6 +2,9 @@
 
 A mobile-first web app for discovering local experiences and events through an interactive map and TikTok-style video feed.
 
+# LIVE DEMO
+Link: https://mapbasedfeedprtotype.netlify.app/
+
 ## ✨ Features
 
 ### 🗺️ **Interactive Map**
