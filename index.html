@@ -1,0 +1,3695 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>TripShepherd – Feed + Map Prototype</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!-- Leaflet CSS -->
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+      crossorigin=""
+    />
+
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+
+    <style>
+      :root {
+        --primary: #ccf068;
+        --bg-dark: #000000;
+        --bg-card: #0a0a0a;
+        --text-white: #ffffff;
+        --text-muted: #999999;
+        --text-dim: #666666;
+        --feed-width: 420px;
+        --nav-height: 75px;
+        --border-color: #1a1a1a;
+      }
+
+      * {
+        box-sizing: border-box;
+        -webkit-tap-highlight-color: transparent;
+      }
+
+      body {
+        margin: 0;
+        padding: 0;
+        font-family: "Inter", sans-serif;
+        background: var(--bg-dark);
+        color: var(--text-white);
+        height: 100vh;
+        overflow: hidden;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+      }
+
+      /* LAYOUT */
+      .layout {
+        display: flex;
+        height: 100vh;
+        width: 100vw;
+      }
+
+      .feed {
+        width: var(--feed-width);
+        border-right: 1px solid var(--border-color);
+        display: flex;
+        flex-direction: column;
+        overflow-y: scroll;
+        background: var(--bg-dark);
+        scrollbar-width: none;
+      }
+
+      .feed.video-mode {
+        scroll-snap-type: y mandatory;
+      }
+
+      .feed::-webkit-scrollbar {
+        display: none;
+      }
+
+      /* CARD LIST MODE */
+      .card-list-container {
+        display: none;
+        padding: 120px 20px 100px;
+      }
+
+      .card-list-container.active {
+        display: block;
+      }
+
+      .map-wrapper {
+        flex: 1;
+        position: relative;
+      }
+
+      #map {
+        position: absolute;
+        inset: 0;
+        background: #111;
+      }
+
+      /* VIDEO CARD (Full Screen) */
+      .video-feed-container {
+        display: none;
+      }
+
+      .video-feed-container.active {
+        display: block;
+      }
+
+      .video-card {
+        position: relative;
+        width: 100%;
+        height: 100vh;
+        scroll-snap-align: start;
+        background: #000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+      }
+
+      .video-card video {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        opacity: 0.5;
+        transition: opacity 0.4s;
+      }
+
+      .video-card.active video {
+        opacity: 1;
+      }
+
+      .video-overlay {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: linear-gradient(
+          to top,
+          rgba(0, 0, 0, 0.95) 0%,
+          rgba(0, 0, 0, 0.85) 30%,
+          rgba(0, 0, 0, 0.5) 60%,
+          transparent 100%
+        );
+        padding: 20px;
+        pointer-events: none;
+        z-index: 2;
+      }
+
+      .video-content-box {
+        background: transparent;
+        border: none;
+        border-radius: 0;
+        padding: 0;
+        pointer-events: auto;
+      }
+
+      .video-location {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: rgba(0, 0, 0, 0.6);
+        backdrop-filter: blur(10px);
+        padding: 6px 12px;
+        border-radius: 20px;
+        font-size: 12px;
+        margin-bottom: 14px;
+        color: #fff;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+      }
+
+      .video-location svg {
+        flex-shrink: 0;
+      }
+
+      .video-host {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 14px;
+      }
+
+      .host-avatar {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.1);
+        border: 2px solid rgba(255, 255, 255, 0.2);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 20px;
+      }
+
+      .host-name {
+        font-size: 15px;
+        font-weight: 600;
+        color: #fff;
+      }
+
+      .video-description {
+        font-size: 14px;
+        color: #ddd;
+        line-height: 1.5;
+        margin-bottom: 18px;
+        font-weight: 400;
+      }
+
+      .video-pricing-box {
+        background: transparent;
+        border: none;
+        border-radius: 0;
+        padding: 0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 16px;
+      }
+
+      .pricing-left {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        flex: 1;
+      }
+
+      .pricing-title {
+        font-size: 15px;
+        font-weight: 700;
+        color: var(--primary);
+        margin-bottom: 2px;
+      }
+
+      .pricing-amount {
+        font-size: 20px;
+        font-weight: 700;
+        color: #fff;
+      }
+
+      .pricing-duration {
+        font-size: 12px;
+        color: rgba(255, 255, 255, 0.6);
+      }
+
+      .btn-book {
+        background: var(--primary);
+        color: #000;
+        border: none;
+        border-radius: 8px;
+        padding: 12px 28px;
+        font-size: 14px;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all 0.2s;
+        white-space: nowrap;
+        flex-shrink: 0;
+      }
+
+      .btn-book:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(204, 240, 104, 0.4);
+      }
+
+      .btn-book:active {
+        transform: translateY(0);
+      }
+
+      .video-actions {
+        position: absolute;
+        right: 16px;
+        bottom: 220px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 24px;
+        pointer-events: auto;
+        z-index: 10;
+      }
+
+      .action-btn {
+        background: transparent;
+        backdrop-filter: none;
+        width: auto;
+        height: auto;
+        border-radius: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        border: none;
+        transition: all 0.2s;
+        gap: 6px;
+        color: #fff;
+        padding: 0;
+      }
+
+      .action-btn:hover {
+        background: transparent;
+        transform: scale(1.1);
+        border-color: transparent;
+      }
+
+      .action-btn.liked svg {
+        fill: #ff3b5c;
+        stroke: #ff3b5c;
+      }
+
+      .action-btn svg {
+        width: 28px;
+        height: 28px;
+        stroke-width: 2;
+        filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.8));
+      }
+
+      .action-label {
+        font-size: 13px;
+        font-weight: 700;
+        color: #fff;
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
+      }
+
+      .video-title {
+        font-size: 18px;
+        font-weight: 700;
+        margin-bottom: 0;
+        color: var(--primary);
+        line-height: 1.3;
+      }
+
+      .video-meta {
+        font-size: 12px;
+        color: #bbb;
+        margin-bottom: 0;
+        line-height: 1.4;
+      }
+
+      .pill-badge {
+        display: inline-block;
+        padding: 6px 12px;
+        border-radius: 999px;
+        background: rgba(204, 240, 104, 0.2);
+        border: 1px solid rgba(204, 240, 104, 0.5);
+        color: var(--primary);
+        font-size: 11px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        font-weight: 700;
+        text-shadow: none;
+      }
+
+      .btn-book {
+        pointer-events: auto;
+        background: var(--primary);
+        color: #000;
+        border: none;
+        padding: 12px 28px;
+        border-radius: 30px;
+        font-weight: 700;
+        font-size: 14px;
+        margin-top: 12px;
+        cursor: pointer;
+        display: inline-block;
+        box-shadow: 0 4px 16px rgba(204, 240, 104, 0.3);
+        transition: all 0.2s;
+      }
+
+      /* SECTION HEADERS */
+      .section {
+        margin-bottom: 32px;
+        position: relative;
+        z-index: 1;
+        background: rgba(255, 255, 255, 0.12);
+        border-radius: 16px;
+        padding: 20px;
+        border: 1px solid rgba(255, 255, 255, 0.15);
+      }
+
+      .section-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 16px;
+        padding: 0;
+      }
+
+      .section-title {
+        font-size: 16px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: #ffffff;
+        margin-bottom: 4px;
+      }
+
+      .section-sub {
+        font-size: 11px;
+        color: var(--text-muted);
+        margin-top: 4px;
+        font-weight: 400;
+      }
+
+      .view-all-link {
+        font-size: 12px;
+        color: #000;
+        font-weight: 700;
+        cursor: pointer;
+        text-decoration: none;
+        padding: 8px 16px;
+        border-radius: 8px;
+        transition: all 0.2s;
+        background: var(--primary);
+        border: none;
+        white-space: nowrap;
+      }
+
+      .view-all-link:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(204, 240, 104, 0.3);
+      }
+
+      .view-all-link:active {
+        transform: translateY(0);
+      }
+
+      .cards {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        max-height: none;
+        overflow: visible;
+      }
+
+      .cards.collapsed {
+        max-height: 1100px;
+        overflow: hidden;
+      }
+
+      .cards.expanded {
+        max-height: 600px;
+        overflow-y: auto;
+        padding-right: 4px;
+      }
+
+      .cards.expanded::-webkit-scrollbar {
+        width: 4px;
+      }
+
+      .cards.expanded::-webkit-scrollbar-thumb {
+        background: #333;
+        border-radius: 2px;
+      }
+
+      .cards.expanded::-webkit-scrollbar-track {
+        background: transparent;
+      }
+
+      /* CARDS */
+      .card {
+        position: relative;
+        display: flex;
+        gap: 14px;
+        padding: 12px;
+        border-radius: 16px;
+        background: var(--bg-card);
+        border: 1px solid rgba(246, 246, 246, 0.12);
+        cursor: pointer;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+
+      .card:hover {
+        border-color: rgba(246, 246, 246, 0.25);
+        transform: translateY(-2px);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+        background: #0f0f0f;
+      }
+
+      .card.active {
+        border-color: var(--primary);
+        box-shadow: 0 0 0 1px var(--primary),
+          0 8px 32px rgba(204, 240, 104, 0.2);
+        background: #0f0f0f;
+      }
+
+      .card-thumb {
+        width: 90px;
+        height: 90px;
+        border-radius: 12px;
+        background: #111;
+        object-fit: cover;
+        flex-shrink: 0;
+      }
+
+      .card-body {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        min-width: 0;
+        gap: 6px;
+      }
+
+      .card-label-row {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin-bottom: 2px;
+        font-size: 11px;
+      }
+
+      .pill-type {
+        padding: 4px 8px;
+        border-radius: 6px;
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        font-size: 9px;
+        font-weight: 600;
+        color: var(--text-muted);
+      }
+
+      .pill-status {
+        padding: 4px 8px;
+        border-radius: 6px;
+        background: rgba(204, 240, 104, 0.1);
+        border: 1px solid rgba(204, 240, 104, 0.3);
+        color: var(--primary);
+        font-size: 9px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        font-weight: 600;
+      }
+
+      .card-title {
+        font-size: 15px;
+        font-weight: 600;
+        margin-bottom: 0;
+        line-height: 1.3;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+        letter-spacing: -0.01em;
+      }
+
+      .card-meta-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 11px;
+        color: var(--text-muted);
+        gap: 12px;
+      }
+
+      .card-right-meta {
+        text-align: right;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .btn-view-details {
+        width: 32px;
+        height: 32px;
+        padding: 0;
+        background: rgba(255, 255, 255, 0.08);
+        color: var(--text-muted);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 8px;
+        font-size: 16px;
+        cursor: pointer;
+        transition: all 0.2s;
+        text-align: center;
+        text-decoration: none;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+      }
+
+      .btn-view-details:hover {
+        transform: scale(1.05);
+        background: var(--primary);
+        border-color: var(--primary);
+        color: #000;
+      }
+
+      .btn-view-details:hover svg {
+        stroke: #000;
+      }
+
+      .btn-view-details:active {
+        transform: scale(0.95);
+      }
+
+      .btn-view-details svg {
+        width: 16px;
+        height: 16px;
+        stroke: currentColor;
+        transition: all 0.2s;
+      }
+
+      .card-left-meta {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        flex: 1;
+        min-width: 0;
+      }
+
+      .card-right-meta {
+        text-align: right;
+        flex-shrink: 0;
+      }
+
+      .price {
+        font-weight: 700;
+        color: var(--text-white);
+        font-size: 16px;
+        line-height: 1;
+        margin-bottom: 2px;
+      }
+
+      .time {
+        font-size: 11px;
+        color: var(--text-dim);
+        font-weight: 500;
+      }
+
+      .city {
+        font-size: 11px;
+        color: var(--text-muted);
+      }
+
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        font-size: 11px;
+        font-weight: 500;
+      }
+
+      .chip-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 999px;
+        background: var(--primary);
+        flex-shrink: 0;
+      }
+
+      .empty-msg {
+        font-size: 13px;
+        color: var(--text-dim);
+        padding: 32px 20px;
+        text-align: center;
+        font-weight: 500;
+      }
+
+      /* FEED HEADER (Fixed at top) */
+      .feed-header {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: var(--feed-width);
+        z-index: 100;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 20px 20px 16px;
+        background: rgba(0, 0, 0, 0.98);
+        backdrop-filter: blur(20px);
+        border-bottom: 1px solid rgba(204, 240, 104, 0.2);
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .brand-avatar {
+        width: 36px;
+        height: 36px;
+        border-radius: 10px;
+        background: var(--primary);
+        color: #000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 800;
+        font-size: 16px;
+      }
+
+      .brand-text {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+
+      .brand-name {
+        font-weight: 700;
+        font-size: 16px;
+        letter-spacing: -0.02em;
+      }
+
+      .brand-sub {
+        font-size: 11px;
+        color: var(--text-dim);
+        font-weight: 500;
+      }
+
+      /* TABS (Fixed below header) */
+      .type-tabs {
+        position: fixed;
+        top: 73px;
+        left: 20px;
+        z-index: 100;
+        display: inline-flex;
+        gap: 4px;
+        padding: 4px;
+        background: rgba(10, 10, 10, 0.95);
+        border-radius: 12px;
+        border: 1px solid rgba(246, 246, 246, 0.12);
+        backdrop-filter: blur(20px);
+      }
+
+      .type-tab {
+        padding: 8px 16px;
+        font-size: 12px;
+        border-radius: 8px;
+        cursor: pointer;
+        color: var(--text-muted);
+        font-weight: 600;
+        border: 1px solid transparent;
+        user-select: none;
+        transition: all 0.2s;
+      }
+
+      .type-tab:hover {
+        color: var(--text-white);
+        background: rgba(255, 255, 255, 0.05);
+      }
+
+      .type-tab.active {
+        background: var(--primary);
+        color: #000;
+        border-color: var(--primary);
+      }
+
+      .live-tab {
+        background: rgba(255, 59, 92, 0.1);
+        border-color: rgba(255, 59, 92, 0.3);
+      }
+
+      .live-tab.active {
+        background: rgba(255, 59, 92, 0.2);
+        border-color: #ff3b5c;
+        color: #fff;
+      }
+
+      .live-dot {
+        display: inline-block;
+        width: 6px;
+        height: 6px;
+        background: #ff3b5c;
+        border-radius: 50%;
+        margin-right: 4px;
+        animation: pulse-live 2s infinite;
+      }
+
+      @keyframes pulse-live {
+        0%,
+        100% {
+          opacity: 1;
+          transform: scale(1);
+        }
+        50% {
+          opacity: 0.4;
+          transform: scale(0.8);
+        }
+      }
+
+      /* MAP OVERLAY: SUMMARY BAR */
+      .map-summary {
+        position: absolute;
+        left: 50%;
+        bottom: 100px;
+        transform: translateX(-50%);
+        z-index: 999;
+        background: rgba(0, 0, 0, 0.9);
+        border-radius: 16px;
+        padding: 12px 20px;
+        border: 1px solid rgba(246, 246, 246, 0.12);
+        display: inline-flex;
+        align-items: center;
+        gap: 12px;
+        font-size: 12px;
+        cursor: pointer;
+        backdrop-filter: blur(20px);
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+        max-width: 400px;
+        transition: all 0.2s;
+      }
+
+      .map-summary:hover {
+        transform: translateX(-50%) translateY(-2px);
+        border-color: var(--primary);
+        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.8);
+      }
+
+      .map-summary-icon {
+        width: 32px;
+        height: 32px;
+        border-radius: 10px;
+        background: var(--primary);
+        color: #000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        font-size: 14px;
+        flex-shrink: 0;
+      }
+
+      .map-summary-content {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+      }
+
+      .map-summary-title {
+        font-size: 13px;
+        font-weight: 600;
+        letter-spacing: -0.01em;
+      }
+
+      .map-summary-sub {
+        font-size: 11px;
+        color: var(--text-dim);
+        font-weight: 500;
+      }
+
+      /* MARKERS - Clean & Modern */
+      .marker-dot {
+        width: 40px;
+        height: 40px;
+        background: rgba(0, 0, 0, 0.9);
+        backdrop-filter: blur(10px);
+        border: 2px solid var(--primary);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 16px;
+        cursor: pointer;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        box-shadow: 0 4px 12px rgba(204, 240, 104, 0.3),
+          0 0 0 0 rgba(204, 240, 104, 0.4);
+        animation: pulse 2s infinite;
+      }
+
+      @keyframes pulse {
+        0%,
+        100% {
+          box-shadow: 0 4px 12px rgba(204, 240, 104, 0.3),
+            0 0 0 0 rgba(204, 240, 104, 0.4);
+        }
+        50% {
+          box-shadow: 0 4px 16px rgba(204, 240, 104, 0.4),
+            0 0 0 8px rgba(204, 240, 104, 0.1);
+        }
+      }
+
+      @keyframes markerExpand {
+        0% {
+          transform: scale(0);
+          opacity: 0;
+        }
+        50% {
+          transform: scale(1.2);
+        }
+        100% {
+          transform: scale(1);
+          opacity: 1;
+        }
+      }
+
+      /* Cluster Marker Styles */
+      .marker-cluster {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        cursor: pointer;
+        transition: all 0.3s;
+      }
+
+      .cluster-icon {
+        width: 56px;
+        height: 56px;
+        background: var(--primary);
+        border-radius: 50%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 4px 12px rgba(204, 240, 104, 0.4);
+        border: 3px solid #000;
+        position: relative;
+        z-index: 10;
+      }
+
+      /* New Image-based Cluster Icon */
+      .cluster-icon-image {
+        width: 64px;
+        height: 64px;
+        border-radius: 50%;
+        position: relative;
+        overflow: visible;
+        border: 4px solid var(--primary);
+        box-shadow: 0 4px 16px rgba(204, 240, 104, 0.6);
+        z-index: 10;
+        cursor: pointer;
+        transition: all 0.3s;
+        background: #000;
+      }
+
+      .cluster-icon-image:hover {
+        transform: scale(1.08);
+        box-shadow: 0 6px 24px rgba(204, 240, 104, 0.8);
+        border-width: 5px;
+      }
+
+      .cluster-thumbnail {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        object-position: center center;
+        display: block;
+        border-radius: 50%;
+        clip-path: circle(50% at 50% 50%);
+      }
+
+      .cluster-count-badge {
+        position: absolute;
+        top: -7px;
+        right: -7px;
+        background: #ff3b5c;
+        color: #fff;
+        font-size: 12px;
+        font-weight: 900;
+        min-width: 28px;
+        height: 28px;
+        padding: 0 7px;
+        border-radius: 14px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: 3px solid #000;
+        box-shadow: 0 4px 12px rgba(255, 59, 92, 0.8),
+          0 0 0 1px rgba(255, 59, 92, 0.4);
+        z-index: 10001;
+        line-height: 1;
+      }
+
+      .cluster-emoji {
+        font-size: 20px;
+        line-height: 1;
+      }
+
+      .cluster-count {
+        font-size: 11px;
+        font-weight: 800;
+        color: #000;
+        background: rgba(255, 255, 255, 0.9);
+        padding: 1px 5px;
+        border-radius: 10px;
+        margin-top: 2px;
+      }
+
+      .cluster-label {
+        background: rgba(0, 0, 0, 0.9);
+        color: #fff;
+        padding: 4px 10px;
+        border-radius: 12px;
+        font-size: 11px;
+        font-weight: 700;
+        margin-top: 6px;
+        white-space: nowrap;
+        border: 1px solid rgba(204, 240, 104, 0.3);
+      }
+
+      .cluster-popup {
+        position: absolute;
+        bottom: 70px;
+        left: 50%;
+        transform: translateX(-50%) scale(0);
+        background: rgba(0, 0, 0, 0.95);
+        backdrop-filter: blur(20px);
+        border: 1px solid rgba(204, 240, 104, 0.3);
+        border-radius: 16px;
+        min-width: 240px;
+        max-width: 280px;
+        padding: 12px;
+        opacity: 0;
+        pointer-events: none;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        z-index: 10000;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+      }
+
+      .marker-cluster.expanded .cluster-popup {
+        transform: translateX(-50%) scale(1);
+        opacity: 1;
+        pointer-events: auto;
+      }
+
+      .cluster-popup-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding-bottom: 10px;
+        margin-bottom: 10px;
+      }
+
+      .cluster-popup-header strong {
+        font-size: 14px;
+        color: var(--primary);
+      }
+
+      .cluster-popup-header span {
+        font-size: 11px;
+        color: var(--text-muted);
+      }
+
+      .cluster-popup-list {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        max-height: 250px;
+        overflow-y: auto;
+        overflow-x: hidden;
+      }
+
+      .cluster-popup-list::-webkit-scrollbar {
+        width: 4px;
+      }
+
+      .cluster-popup-list::-webkit-scrollbar-thumb {
+        background: rgba(204, 240, 104, 0.5);
+        border-radius: 2px;
+      }
+
+      .cluster-popup-list::-webkit-scrollbar-track {
+        background: transparent;
+      }
+
+      .cluster-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px;
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 10px;
+        cursor: pointer;
+        transition: all 0.2s;
+        border: 1px solid transparent;
+      }
+
+      .cluster-item:hover {
+        background: rgba(255, 255, 255, 0.1);
+        transform: translateX(4px);
+      }
+
+      .cluster-item-emoji {
+        font-size: 20px;
+        flex-shrink: 0;
+      }
+
+      .cluster-item-info {
+        flex: 1;
+        min-width: 0;
+      }
+
+      .cluster-item-title {
+        font-size: 12px;
+        font-weight: 600;
+        color: #fff;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .cluster-item-price {
+        font-size: 11px;
+        color: var(--primary);
+        font-weight: 700;
+        margin-top: 2px;
+      }
+
+      .expanded-marker {
+        animation: markerExpand 0.3s ease-out;
+      }
+
+      /* Live User Avatar Markers */
+      .live-user-marker {
+        position: relative;
+        width: 50px;
+        height: 50px;
+        cursor: pointer;
+      }
+
+      .user-avatar {
+        width: 50px;
+        height: 50px;
+        border-radius: 50%;
+        border: 3px solid #ff3b5c;
+        box-shadow: 0 4px 16px rgba(255, 59, 92, 0.6);
+        object-fit: cover;
+        animation: pulse-avatar 2s infinite;
+      }
+
+      @keyframes pulse-avatar {
+        0%,
+        100% {
+          box-shadow: 0 4px 16px rgba(255, 59, 92, 0.6),
+            0 0 0 0 rgba(255, 59, 92, 0.4);
+        }
+        50% {
+          box-shadow: 0 4px 20px rgba(255, 59, 92, 0.8),
+            0 0 0 8px rgba(255, 59, 92, 0.2);
+        }
+      }
+
+      .live-badge {
+        position: absolute;
+        bottom: -4px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: #ff3b5c;
+        color: white;
+        font-size: 8px;
+        font-weight: 800;
+        padding: 2px 6px;
+        border-radius: 10px;
+        white-space: nowrap;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+      }
+
+      @keyframes shine {
+        0%,
+        100% {
+          box-shadow: 0 4px 12px rgba(204, 240, 104, 0.3),
+            0 0 0 0 rgba(204, 240, 104, 0.4);
+        }
+        50% {
+          box-shadow: 0 4px 16px rgba(204, 240, 104, 0.4),
+            0 0 0 6px rgba(204, 240, 104, 0.12);
+        }
+      }
+
+      .marker-dot.filtered {
+        animation: shine 2.5s ease-in-out infinite;
+      }
+
+      .marker-dot:hover {
+        transform: scale(1.2);
+        background: var(--primary);
+        box-shadow: 0 8px 24px rgba(204, 240, 104, 0.5),
+          0 0 0 12px rgba(204, 240, 104, 0.15);
+        animation: none;
+      }
+
+      .marker-dot.active {
+        background: var(--primary);
+        transform: scale(1.3);
+        box-shadow: 0 8px 24px rgba(204, 240, 104, 0.6),
+          0 0 0 12px rgba(204, 240, 104, 0.2);
+        border-width: 3px;
+        animation: none;
+      }
+
+      .marker-dot .emoji {
+        filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+      }
+
+      /* Marker Popup on Hover */
+      .marker-popup {
+        position: absolute;
+        bottom: 100%;
+        left: 50%;
+        transform: translateX(-50%) translateY(-8px);
+        background: rgba(0, 0, 0, 0.95);
+        backdrop-filter: blur(20px);
+        border: 1px solid rgba(246, 246, 246, 0.12);
+        border-radius: 12px;
+        padding: 10px 14px;
+        min-width: 180px;
+        max-width: 220px;
+        font-size: 12px;
+        font-weight: 600;
+        color: white;
+        opacity: 0;
+        pointer-events: none;
+        transition: all 0.2s;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+        z-index: 1000;
+      }
+
+      .marker-popup::after {
+        content: "";
+        position: absolute;
+        top: 100%;
+        left: 50%;
+        transform: translateX(-50%);
+        border: 6px solid transparent;
+        border-top-color: rgba(0, 0, 0, 0.95);
+      }
+
+      .marker-dot:hover .marker-popup {
+        opacity: 1;
+        transform: translateX(-50%) translateY(-12px);
+        pointer-events: auto;
+      }
+
+      .marker-popup-title {
+        font-size: 12px;
+        font-weight: 600;
+        margin-bottom: 6px;
+        line-height: 1.3;
+      }
+
+      .marker-popup-price {
+        color: var(--primary);
+        font-weight: 700;
+        font-size: 13px;
+        margin-bottom: 8px;
+        display: block;
+      }
+
+      .marker-popup-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+        width: 100%;
+        padding: 7px 10px;
+        background: var(--primary);
+        color: #000;
+        border: none;
+        border-radius: 8px;
+        font-size: 11px;
+        font-weight: 700;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.2s;
+        text-decoration: none;
+        margin-top: 6px;
+      }
+
+      .marker-popup-btn:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(204, 240, 104, 0.4);
+      }
+
+      /* Cluster Markers */
+      .marker-cluster-custom {
+        background: rgba(204, 240, 104, 0.2);
+        border: 3px solid var(--primary);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--primary);
+        font-weight: 800;
+        font-size: 16px;
+        box-shadow: 0 4px 16px rgba(204, 240, 104, 0.4);
+        transition: all 0.3s;
+        cursor: pointer;
+      }
+
+      .marker-cluster-custom:hover {
+        background: rgba(204, 240, 104, 0.3);
+        transform: scale(1.1);
+        box-shadow: 0 6px 20px rgba(204, 240, 104, 0.5);
+      }
+
+      /* Map Controls */
+      .map-controls {
+        position: absolute;
+        top: 20px;
+        left: 20px;
+        z-index: 1000;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      .map-control-btn {
+        width: 44px;
+        height: 44px;
+        background: rgba(0, 0, 0, 0.9);
+        backdrop-filter: blur(20px);
+        border: 1px solid rgba(246, 246, 246, 0.12);
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.2s;
+        color: white;
+        font-size: 20px;
+        font-weight: 700;
+      }
+
+      .map-control-btn:hover {
+        background: var(--primary);
+        color: #000;
+        transform: scale(1.05);
+        box-shadow: 0 4px 16px rgba(204, 240, 104, 0.3);
+      }
+
+      /* BOTTOM NAVIGATION */
+      .bottom-nav {
+        position: fixed;
+        bottom: 0;
+        left: 50%;
+        transform: translateX(-50%);
+        max-width: 500px;
+        width: 100%;
+        height: var(--nav-height);
+        background: rgba(0, 0, 0, 0.98);
+        backdrop-filter: blur(20px);
+        border-top: 1px solid rgba(204, 240, 104, 0.2);
+        border-left: 1px solid rgba(204, 240, 104, 0.15);
+        border-right: 1px solid rgba(204, 240, 104, 0.15);
+        border-radius: 24px 24px 0 0;
+        z-index: 2000;
+        display: flex;
+        align-items: center;
+        justify-content: space-around;
+        padding: 0 20px;
+        box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.5);
+      }
+
+      .nav-item {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 5px;
+        color: var(--text-dim);
+        font-size: 11px;
+        font-weight: 600;
+        cursor: pointer;
+        padding: 10px 16px;
+        border-radius: 12px;
+        transition: all 0.2s;
+        user-select: none;
+      }
+
+      .nav-item svg {
+        width: 22px;
+        height: 22px;
+        stroke-width: 2;
+        transition: all 0.2s;
+      }
+
+      .nav-item:hover {
+        color: var(--text-white);
+        background: rgba(255, 255, 255, 0.05);
+      }
+
+      .nav-item:hover svg {
+        transform: translateY(-1px);
+      }
+
+      .nav-item.active {
+        color: var(--primary);
+        position: relative;
+      }
+
+      .nav-item.active::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 32px;
+        height: 3px;
+        background: var(--primary);
+        border-radius: 0 0 3px 3px;
+      }
+
+      .nav-create {
+        background: var(--primary);
+        color: #000;
+        width: 56px;
+        height: 56px;
+        border-radius: 16px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transform: translateY(-8px);
+        box-shadow: 0 8px 24px rgba(204, 240, 104, 0.3);
+        transition: all 0.2s;
+        font-size: 0;
+      }
+
+      .nav-create:hover {
+        transform: translateY(-10px) scale(1.05);
+        box-shadow: 0 12px 32px rgba(204, 240, 104, 0.4);
+      }
+
+      .nav-create svg {
+        width: 24px;
+        height: 24px;
+        stroke-width: 2.5;
+      }
+
+      /* MOBILE DRAG HANDLE */
+      .feed-drag-handle {
+        display: none;
+      }
+
+      .mobile-view-toggle {
+        display: none;
+      }
+
+      @media (max-width: 900px) {
+        .layout {
+          flex-direction: column;
+        }
+
+        /* Default: Map only (feed hidden) */
+        .feed {
+          position: fixed;
+          z-index: 1000;
+          width: 100%;
+          height: 0;
+          bottom: 0;
+          top: auto;
+          border-right: none;
+          border-top: none;
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          overflow: hidden;
+        }
+
+        /* When feed view selected: show full feed */
+        .feed.feed-view {
+          height: 100vh;
+          border-top: 1px solid var(--border-color);
+          box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.4);
+          overflow-y: auto;
+        }
+
+        .feed-header {
+          width: 100%;
+          padding: 10px 14px;
+          border-bottom: 1px solid rgba(204, 240, 104, 0.2);
+        }
+
+        .bottom-nav {
+          max-width: 100%;
+          left: 0;
+          right: 0;
+          transform: none;
+          border-radius: 0;
+          border-left: none;
+          border-right: none;
+        }
+
+        .brand-avatar {
+          width: 28px;
+          height: 28px;
+          font-size: 13px;
+          border-radius: 8px;
+        }
+
+        .brand-name {
+          font-size: 14px;
+        }
+
+        .brand-sub {
+          font-size: 10px;
+        }
+
+        .type-tabs {
+          left: 14px;
+          top: 56px;
+          gap: 3px;
+          padding: 3px;
+        }
+
+        .type-tab {
+          padding: 6px 12px;
+          font-size: 10px;
+        }
+
+        /* Default: Map full screen */
+        .map-wrapper {
+          flex: none;
+          height: 100vh;
+        }
+
+        /* When feed view selected: hide map */
+        .feed.feed-view ~ .map-wrapper {
+          height: 0;
+          overflow: hidden;
+        }
+
+        /* Map summary positioning */
+        .map-summary {
+          bottom: 80px;
+          max-width: calc(100vw - 32px);
+          padding: 10px 16px;
+          left: 16px;
+          right: 16px;
+          transform: none;
+          width: auto;
+        }
+
+        /* Hide summary when feed is showing */
+        .feed.feed-view ~ .map-wrapper .map-summary {
+          display: none;
+        }
+
+        .mobile-view-toggle {
+          display: flex;
+          position: fixed;
+          top: 14px;
+          right: 14px;
+          z-index: 1002;
+          background: rgba(0, 0, 0, 0.9);
+          backdrop-filter: blur(20px);
+          border: 1px solid rgba(246, 246, 246, 0.12);
+          border-radius: 10px;
+          padding: 3px;
+          gap: 3px;
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+
+        .view-btn {
+          padding: 7px 11px;
+          background: transparent;
+          border: none;
+          color: var(--text-dim);
+          font-size: 10px;
+          font-weight: 600;
+          border-radius: 7px;
+          cursor: pointer;
+          transition: all 0.2s;
+          font-family: "Inter", sans-serif;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+        }
+
+        .view-btn:hover {
+          color: var(--text-white);
+          background: rgba(255, 255, 255, 0.05);
+        }
+
+        .view-btn.active {
+          background: var(--primary);
+          color: #000;
+        }
+
+        /* Map controls - positioned to avoid overlap */
+        .map-controls {
+          top: 100px;
+          left: 14px;
+          gap: 8px;
+        }
+
+        /* Hide map controls when feed is expanded */
+        .feed.expanded ~ .map-wrapper .map-controls {
+          opacity: 0.3;
+          pointer-events: none;
+        }
+
+        .map-control-btn {
+          width: 38px;
+          height: 38px;
+          font-size: 17px;
+        }
+
+        /* Smaller markers on mobile */
+        .marker-dot {
+          width: 32px;
+          height: 32px;
+          font-size: 13px;
+          border-width: 2px;
+        }
+
+        .marker-popup {
+          font-size: 10px;
+          padding: 8px 10px;
+          max-width: 160px;
+          min-width: 160px;
+        }
+
+        .marker-popup-title {
+          font-size: 11px;
+          margin-bottom: 4px;
+        }
+
+        .marker-popup-price {
+          font-size: 12px;
+          margin-bottom: 6px;
+        }
+
+        .marker-popup-btn {
+          padding: 6px 10px;
+          font-size: 10px;
+        }
+
+        .btn-view-details {
+          width: 28px;
+          height: 28px;
+        }
+
+        .btn-view-details svg {
+          width: 14px;
+          height: 14px;
+        }
+
+        /* Video cards - hidden by default, full screen when feed view */
+        .video-card {
+          height: 0;
+        }
+
+        .feed.feed-view .video-card {
+          height: 100vh;
+        }
+
+        .video-overlay {
+          padding: 14px;
+          padding-bottom: 100px;
+        }
+
+        .video-content-box {
+          padding: 0;
+        }
+
+        .video-location {
+          font-size: 11px;
+          padding: 5px 10px;
+        }
+
+        .video-location svg {
+          width: 12px;
+          height: 12px;
+        }
+
+        .pricing-amount {
+          font-size: 18px;
+        }
+
+        .video-pricing-box {
+          flex-direction: column;
+          align-items: stretch;
+          gap: 12px;
+        }
+
+        .btn-book {
+          width: 100%;
+          padding: 10px 20px;
+        }
+
+        .video-actions {
+          right: 12px;
+          bottom: 200px;
+          gap: 20px;
+        }
+
+        .feed.feed-view .video-actions {
+          bottom: 200px;
+        }
+
+        .action-btn svg {
+          width: 26px;
+          height: 26px;
+        }
+
+        .action-label {
+          font-size: 12px;
+        }
+
+        .card-list-container {
+          padding: 100px 12px 20px;
+        }
+
+        .cards {
+          gap: 8px;
+        }
+
+        .card {
+          padding: 8px;
+          border-radius: 12px;
+        }
+
+        .card-thumb {
+          width: 70px;
+          height: 70px;
+          border-radius: 10px;
+        }
+
+        .card-title {
+          font-size: 13px;
+        }
+
+        .pill-type,
+        .pill-status {
+          font-size: 9px;
+          padding: 2px 7px;
+        }
+
+        .card-meta-row {
+          font-size: 10px;
+        }
+
+        .price {
+          font-size: 12px;
+        }
+
+        .time,
+        .city,
+        .chip {
+          font-size: 10px;
+        }
+
+        .section {
+          margin-bottom: 16px;
+        }
+
+        .section {
+          padding: 14px;
+          border-radius: 12px;
+        }
+
+        .section-header {
+          margin-bottom: 10px;
+          padding: 0;
+        }
+
+        .section-title {
+          font-size: 14px;
+        }
+
+        .section-sub {
+          font-size: 10px;
+          margin-top: 2px;
+        }
+
+        .view-all-link {
+          font-size: 11px;
+          padding: 6px 12px;
+        }
+
+        .nav-item {
+          padding: 8px 10px;
+          gap: 3px;
+        }
+
+        .nav-item svg {
+          width: 20px;
+          height: 20px;
+        }
+
+        .nav-item span {
+          font-size: 10px;
+        }
+
+        .nav-create {
+          width: 50px;
+          height: 50px;
+          border-radius: 13px;
+          transform: translateY(-6px);
+        }
+
+        .nav-create svg {
+          width: 22px;
+          height: 22px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="layout">
+      <!-- Mobile view toggle -->
+      <div class="mobile-view-toggle">
+        <button class="view-btn active" onclick="setMobileView('map')">
+          Map
+        </button>
+        <button class="view-btn" onclick="setMobileView('feed')">Feed</button>
+      </div>
+
+      <!-- LEFT: VIDEO FEED -->
+      <aside class="feed" id="feed">
+        <!-- Fixed Header -->
+        <div class="feed-header">
+          <div class="brand">
+            <div class="brand-avatar">TS</div>
+            <div class="brand-text">
+              <div class="brand-name">TripShepherd</div>
+              <div class="brand-sub">Curated feed • Map-first</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Experiences / Events tabs -->
+        <div class="type-tabs">
+          <div
+            class="type-tab active"
+            data-type="all"
+            onclick="setTypeFilter(this,'all')"
+          >
+            All
+          </div>
+          <div
+            class="type-tab"
+            data-type="exp"
+            onclick="setTypeFilter(this,'exp')"
+          >
+            Experiences
+          </div>
+          <div
+            class="type-tab"
+            data-type="evt"
+            onclick="setTypeFilter(this,'evt')"
+          >
+            Events
+          </div>
+          <div
+            class="type-tab live-tab"
+            data-type="live"
+            onclick="setTypeFilter(this,'live')"
+          >
+            <span class="live-dot"></span>Live Now
+          </div>
+        </div>
+
+        <!-- Card List View (for "All" tab) -->
+        <div class="card-list-container active" id="card-list-container">
+          <!-- Happening Today -->
+          <section class="section">
+            <div class="section-header">
+              <div>
+                <div class="section-title">Happening Today</div>
+                <div class="section-sub">
+                  Live right now or starting later today
+                </div>
+              </div>
+              <a
+                class="view-all-link"
+                id="view-all-today"
+                onclick="toggleViewAll('today')"
+                >View All</a
+              >
+            </div>
+            <div class="cards collapsed" id="cards-today"></div>
+            <div class="empty-msg" id="empty-today" style="display: none">
+              No items today for this filter.
+            </div>
+          </section>
+
+          <!-- Coming Up -->
+          <section class="section">
+            <div class="section-header">
+              <div>
+                <div class="section-title">Coming Up</div>
+                <div class="section-sub">Starting later this week and next</div>
+              </div>
+              <a
+                class="view-all-link"
+                id="view-all-upcoming"
+                onclick="toggleViewAll('upcoming')"
+                >View All</a
+              >
+            </div>
+            <div class="cards collapsed" id="cards-upcoming"></div>
+            <div class="empty-msg" id="empty-upcoming" style="display: none">
+              No upcoming items for this filter.
+            </div>
+          </section>
+        </div>
+
+        <!-- Video Feed View (for "Experiences" / "Events" tabs) -->
+        <div class="video-feed-container" id="video-feed-container"></div>
+      </aside>
+
+      <!-- RIGHT: MAP -->
+      <div class="map-wrapper">
+        <div id="map"></div>
+
+        <!-- Summary bar -->
+        <div class="map-summary" onclick="flyToAll()">
+          <div class="map-summary-icon" id="summary-icon">📍</div>
+          <div class="map-summary-content">
+            <div class="map-summary-title" id="summary-title">
+              Exploring map
+            </div>
+            <div class="map-summary-sub" id="summary-sub">
+              Scroll feed to move the map
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bottom Navigation -->
+    <div class="bottom-nav">
+      <div class="nav-item active">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+        </svg>
+        <span>Home</span>
+      </div>
+      <div class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
+          <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
+        </svg>
+        <span>Feed</span>
+      </div>
+      <div class="nav-item nav-create">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <line x1="12" y1="5" x2="12" y2="19"></line>
+          <line x1="5" y1="12" x2="19" y2="12"></line>
+        </svg>
+      </div>
+      <div class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <circle cx="11" cy="11" r="8"></circle>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+        <span>Search</span>
+      </div>
+      <div class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+          <circle cx="12" cy="7" r="4"></circle>
+        </svg>
+        <span>Profile</span>
+      </div>
+    </div>
+
+    <!-- Leaflet JS -->
+    <script
+      src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+      integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+      crossorigin=""
+    ></script>
+
+    <script>
+      // ------- REAL DATA FROM API --------
+      const experiences = [
+        {
+          id: "CaUMRLYkbYFzfi17whJN",
+          title: "Puppy Yoga with Mini Goldendoodles",
+          price: 40.02,
+          city: "Niagara Falls",
+          lat: 43.05888119999999,
+          lng: -79.0519462,
+          video:
+            "https://d3hske9hd2ghod.cloudfront.net/experiences/Puppy_Yoga_New_Video.mp4",
+          thumb:
+            "https://d3hske9hd2ghod.cloudfront.net/experiences/thumbnails/c3ff7ab3-0725-48cb-9077-81b839566780.jpg",
+          type: "exp",
+          status: "today",
+          time: "11:00 AM",
+          isLive: true,
+          liveUsers: [
+            { name: "Sarah M.", avatar: "https://i.pravatar.cc/150?img=1" },
+            { name: "Mike J.", avatar: "https://i.pravatar.cc/150?img=3" },
+          ],
+        },
+        {
+          id: "fduCC8xgwfbFMDUXhuWi",
+          title: "Museum of the Moving Image",
+          price: 35.25,
+          city: "Queens",
+          lat: 40.7563454,
+          lng: -73.9239496,
+          video:
+            "https://d3hske9hd2ghod.cloudfront.net/converted/experiences/4f3119cc-fbc8-4547-b731-16ab670f9a8e.mp4",
+          thumb:
+            "https://d3hske9hd2ghod.cloudfront.net/experiences/thumbnails/00cc3cdd-89dd-4570-91fd-6b090813facd.jpg",
+          type: "evt",
+          status: "today",
+          time: "2:00 PM",
+        },
+        {
+          id: "aGUEt4QRmN3G5xdYHB91",
+          title: "Tea Around Town",
+          price: 260.85,
+          city: "New York",
+          lat: 40.7532084,
+          lng: -73.98076569999999,
+          video:
+            "https://d3hske9hd2ghod.cloudfront.net/converted/experiences/90f10f3c-c9b6-4066-9a99-8eb8ae580192.mp4",
+          thumb:
+            "https://d3hske9hd2ghod.cloudfront.net/experiences/thumbnails/55b9da3d-27f9-47cf-9f8a-aa47cb77ea64.jpg",
+          type: "exp",
+          status: "upcoming",
+          time: "Tomorrow • 3:00 PM",
+          isLive: true,
+          liveUsers: [
+            { name: "Emma L.", avatar: "https://i.pravatar.cc/150?img=5" },
+            { name: "David K.", avatar: "https://i.pravatar.cc/150?img=7" },
+          ],
+        },
+        {
+          id: "o0UzNqrsjOvYY51DvF2y",
+          title: "Open Bar Paint Class",
+          price: 77.55,
+          city: "New York",
+          lat: 40.7193177,
+          lng: -73.99151719999999,
+          video:
+            "https://d3hske9hd2ghod.cloudfront.net/converted/experiences/ff75c859-d6f1-451b-853d-e73b8fb7977e.mp4",
+          thumb:
+            "https://d3hske9hd2ghod.cloudfront.net/experiences/thumbnails/ab5548ba-5129-492f-9573-a2286686560f.jpg",
+          type: "evt",
+          status: "today",
+          time: "7:00 PM",
+        },
+        {
+          id: "kT21GMUuoboGIK6GLdGX",
+          title: "Chinatown and Little Italy Food Walking NYC Tour",
+          price: 126.9,
+          city: "New York",
+          lat: 40.7162871,
+          lng: -74.0018693,
+          video:
+            "https://d3hske9hd2ghod.cloudfront.net/converted/experiences/fec0b961-3b7d-490a-ae94-ba554286d0af-nyc food tour ad no bgm.mp4",
+          thumb:
+            "https://d3hske9hd2ghod.cloudfront.net/experiences/thumbnails/ebb9f3f1-c2f3-4286-878b-b460a6c05195-image-2.jpeg",
+          type: "evt",
+          status: "upcoming",
+          time: "Saturday • 1:00 PM",
+        },
+        {
+          id: "ed9okvfzllYAXoD9QWXN",
+          title: "American Museum of Natural History",
+          price: 45.12,
+          city: "New York",
+          lat: 40.781135,
+          lng: -73.9736037,
+          video:
+            "https://d3hske9hd2ghod.cloudfront.net/converted/experiences/09861550-7bc9-4de6-855f-d7fa2ca0f51a.mp4",
+          thumb:
+            "https://d3hske9hd2ghod.cloudfront.net/experiences/thumbnails/a4bc60d3-8e20-4d04-9889-c75e4bf80183.jpg",
+          type: "evt",
+          status: "today",
+          time: "10:00 AM",
+        },
+        {
+          id: "Fo5dEfSEmfFnNhi883eI",
+          title: "Pasta Making and Cheese Tasting",
+          price: 148.05,
+          city: "New York",
+          lat: 40.7527277,
+          lng: -73.97723529999999,
+          video:
+            "https://d3hske9hd2ghod.cloudfront.net/converted/experiences/7ad4cab6-2d82-4845-8b57-ab8edc55c61a.mp4",
+          thumb:
+            "https://d3hske9hd2ghod.cloudfront.net/experiences/thumbnails/d0ed24c4-7837-4dcf-a1a0-31635254542c.jpg",
+          type: "exp",
+          status: "upcoming",
+          time: "Friday • 6:00 PM",
+        },
+        {
+          id: "aLHbKOzYv5O4OLvVZPPL",
+          title: "Fuze and Booze",
+          price: 174.84,
+          city: "Brooklyn",
+          lat: 40.6774722,
+          lng: -74.0184446,
+          video:
+            "https://d3hske9hd2ghod.cloudfront.net/converted/experiences/b4342711-b9b2-4526-a354-66ce22fdd053.mp4",
+          thumb:
+            "https://d3hske9hd2ghod.cloudfront.net/experiences/thumbnails/Screenshot+2025-07-03+103519.png",
+          type: "exp",
+          status: "today",
+          time: "5:00 PM",
+        },
+        {
+          id: "tETvY9KGn6j41SVMUmD4",
+          title: "Shooting and Spinning 18+",
+          price: 152.28,
+          city: "New York",
+          lat: 40.75014950000001,
+          lng: -73.9851472,
+          video:
+            "https://d3hske9hd2ghod.cloudfront.net/converted/experiences/3d8838ec-4e83-4fe6-9ed0-376ff335ef91.mp4",
+          thumb:
+            "https://d3hske9hd2ghod.cloudfront.net/experiences/thumbnails/Screenshot+2025-07-03+102948.png",
+          type: "exp",
+          status: "upcoming",
+          time: "Sunday • 4:00 PM",
+        },
+        {
+          id: "vU4ynOM92ZKNFx6TK0tX",
+          title: "Imemersive Art Experience",
+          price: 52.17,
+          city: "New York",
+          lat: 40.725773,
+          lng: -74.0053337,
+          video:
+            "https://d3hske9hd2ghod.cloudfront.net/converted/experiences/4f26bfb5-14a9-4897-ab14-2acfefd41c9c.mp4",
+          thumb:
+            "https://d3hske9hd2ghod.cloudfront.net/experiences/thumbnails/Screenshot+2025-07-03+105420.png",
+          type: "exp",
+          status: "today",
+          time: "3:00 PM",
+        },
+        {
+          id: "Z76bhS8cDhghXBH1ygTB",
+          title: "Museum of Illusions",
+          price: 49.35,
+          city: "New York",
+          lat: 40.7397791,
+          lng: -74.0030523,
+          video:
+            "https://d3hske9hd2ghod.cloudfront.net/converted/experiences/8989a49f-15ab-4630-9ac4-1334eb46d3ab.mp4",
+          thumb:
+            "https://d3hske9hd2ghod.cloudfront.net/experiences/thumbnails/Screenshot+2025-07-03+104519.png",
+          type: "evt",
+          status: "upcoming",
+          time: "Thursday • 12:00 PM",
+        },
+        {
+          id: "t9ulJ3pX9TO5XxfsoBlc",
+          title: "Museum of Icecream",
+          price: 81.78,
+          city: "New York",
+          lat: 40.7236214,
+          lng: -73.99756359999999,
+          video:
+            "https://d3hske9hd2ghod.cloudfront.net/converted/experiences/770e33b2-cd16-47f2-a343-bf0ee916a20e.mp4",
+          thumb:
+            "https://d3hske9hd2ghod.cloudfront.net/experiences/thumbnails/Screenshot+2025-07-03+114627.png",
+          type: "evt",
+          status: "today",
+          time: "1:00 PM",
+        },
+        {
+          id: "4WjY4ieUyiior29FB2rl",
+          title: "Custom Perfume Making ",
+          price: 119.85,
+          city: "New York",
+          lat: 40.7343794,
+          lng: -74.004564,
+          video:
+            "https://d3hske9hd2ghod.cloudfront.net/converted/experiences/82f941d6-8e48-4e31-b07c-7b6a1cb0d23a.mp4",
+          thumb:
+            "https://d3hske9hd2ghod.cloudfront.net/experiences/thumbnails/Screenshot+2025-07-03+114300.png",
+          type: "exp",
+          status: "upcoming",
+          time: "Wednesday • 4:00 PM",
+        },
+        {
+          id: "ehecMtnZjZNteogzHfE3",
+          title: "Textured Painting Picnic Experience",
+          price: 135.36,
+          city: "New York",
+          lat: 40.7825547,
+          lng: -73.9655834,
+          video:
+            "https://d3hske9hd2ghod.cloudfront.net/converted/experiences/21abae2f-1e9a-44d8-894d-8f0f6e75c945.mp4",
+          thumb:
+            "https://d3hske9hd2ghod.cloudfront.net/experiences/thumbnails/Screenshot+2025-07-03+105129.png",
+          type: "evt",
+          status: "today",
+          time: "12:00 PM",
+        },
+        {
+          id: "FIwfizEcB5ZtXRou2rHo",
+          title: "Cake Candle Making Workshop",
+          price: 95.88,
+          city: "Flushing",
+          lat: 40.7612957,
+          lng: -73.7330753,
+          video:
+            "https://d3hske9hd2ghod.cloudfront.net/converted/experiences/b0d22d06-f90f-4ba9-97a3-3a9625ff15fe.mp4",
+          thumb:
+            "https://d3hske9hd2ghod.cloudfront.net/experiences/thumbnails/Screenshot+2025-07-03+120424.png",
+          type: "evt",
+          status: "upcoming",
+          time: "Saturday • 2:00 PM",
+        },
+        {
+          id: "85wgDXhuF6gdHT8VSXlg",
+          title: "Shoe Customization Workshop",
+          price: 289.05,
+          city: "Los Angeles",
+          lat: 34.0135061,
+          lng: -118.2791851,
+          video:
+            "https://d3hske9hd2ghod.cloudfront.net/converted/experiences/ee517afc-7ad3-42b3-81d8-97a39d41d99b.mp4",
+          thumb:
+            "https://d3hske9hd2ghod.cloudfront.net/experiences/thumbnails/Screenshot+2025-07-03+115946.png",
+          type: "evt",
+          status: "upcoming",
+          time: "Friday • 3:00 PM",
+        },
+        {
+          id: "LsffhcNZnS5b5htUiyki",
+          title: "Turkish Mosaic Lamp Workshop",
+          price: 176.25,
+          city: "New York",
+          lat: 40.7547898,
+          lng: -73.99395489999999,
+          video:
+            "https://d3hske9hd2ghod.cloudfront.net/converted/experiences/fe0ad814-0237-489e-a546-d5f79812a8a3.mp4",
+          thumb:
+            "https://d3hske9hd2ghod.cloudfront.net/experiences/thumbnails/Screenshot+2025-07-03+120625.png",
+          type: "evt",
+          status: "today",
+          time: "4:00 PM",
+        },
+        {
+          id: "W5alaxIDnWubtNoXwFAc",
+          title: "Part Ride, Part Museum, All New York.",
+          price: 69.09,
+          city: "New York",
+          lat: 40.7576207,
+          lng: -73.98517609999999,
+          video:
+            "https://d3hske9hd2ghod.cloudfront.net/converted/experiences/841df2af-c173-4854-8139-9a186d787fbe.mp4",
+          thumb:
+            "https://d3hske9hd2ghod.cloudfront.net/experiences/thumbnails/Screenshot+2025-07-03+121050.png",
+          type: "evt",
+          status: "upcoming",
+          time: "Sunday • 11:00 AM",
+        },
+        {
+          id: "cZCPXL8RqY5yFZYbSVF5",
+          title: "Crafting the Perfect Matcha Latte",
+          price: 91.65,
+          city: "Brooklyn",
+          lat: 40.7295258,
+          lng: -73.9581513,
+          video:
+            "https://d3hske9hd2ghod.cloudfront.net/converted/experiences/820acd61-a790-4fb9-a67d-dfe3158f5c78.mp4",
+          thumb:
+            "https://d3hske9hd2ghod.cloudfront.net/experiences/thumbnails/Screenshot+2025-07-03+124548.png",
+          type: "exp",
+          status: "today",
+          time: "10:30 AM",
+        },
+        {
+          id: "Py53Zi6Rt4u9HbVdsOH1",
+          title: "A Union of Hope: 1869 ",
+          price: 49.35,
+          city: "New York",
+          lat: 40.7187653,
+          lng: -73.9900284,
+          video:
+            "https://d3hske9hd2ghod.cloudfront.net/converted/experiences/d2a9efe0-21d5-4832-b5e6-f6357230c297.mp4",
+          thumb:
+            "https://d3hske9hd2ghod.cloudfront.net/experiences/thumbnails/Screenshot+2025-07-03+124328.png",
+          type: "exp",
+          status: "upcoming",
+          time: "Monday • 2:00 PM",
+        },
+        {
+          id: "J8v34hmatvNX2keutpfV",
+          title: "The Bronx Zoo Experience",
+          price: 59.22,
+          city: "Bronx",
+          lat: 40.8510986,
+          lng: -73.8815388,
+          video:
+            "https://d3hske9hd2ghod.cloudfront.net/converted/experiences/bf7b565b-45ab-4fa0-b835-c1b67869e75b.mp4",
+          thumb:
+            "https://d3hske9hd2ghod.cloudfront.net/experiences/thumbnails/Screenshot+2025-07-03+124027.png",
+          type: "evt",
+          status: "today",
+          time: "9:00 AM",
+        },
+        {
+          id: "Zc2KWlj9OWbBf7ylPtii",
+          title: "Meet the Bee's Hive Tour",
+          price: 63.45,
+          city: "New York City",
+          lat: 40.712391,
+          lng: -74.004758,
+          video:
+            "https://d3hske9hd2ghod.cloudfront.net/converted/experiences/86359617-1c81-41e6-99a7-bdc39f4f14cc-Meet the Bee's Hive Tour.mp4",
+          thumb:
+            "https://d3hske9hd2ghod.cloudfront.net/experiences/thumbnails/96d16831-e505-489f-b4cf-4d3c95c7b377-Meet the Bee's Hive Tour.mp4.jpg",
+          type: "evt",
+          status: "upcoming",
+          time: "Tuesday • 3:00 PM",
+        },
+        {
+          id: "PHPvhF1qaBIUYo4z91kQ",
+          title: "Mercer Labs - Museum of Art and Technology Admission",
+          price: 73.32,
+          city: "New York",
+          lat: 40.7104778,
+          lng: -74.01059479999999,
+          video:
+            "https://d3hske9hd2ghod.cloudfront.net/converted/experiences/0980d271-aede-4781-a5d5-7da6d1f92bd1-Mercer Labs Who We Are Trailer 60s.mp4",
+          thumb:
+            "https://d3hske9hd2ghod.cloudfront.net/experiences/thumbnails/3a6458b9-8ff1-4fb6-a825-e9a7e28a099d-Mercer Labs Who We Are Trailer 60s.mp4.jpg",
+          type: "evt",
+          status: "today",
+          time: "11:00 AM",
+        },
+        {
+          id: "f6rltzhArgT7IQYlsbQk",
+          title: "Alpha Helicopter Flight ",
+          price: 139.59,
+          city: "Kearny",
+          lat: 40.72430780000001,
+          lng: -74.1092673,
+          video:
+            "https://d3hske9hd2ghod.cloudfront.net/converted/experiences/bf6075ff-babd-487c-87e5-0950d9967e9f-Alpha Helicopter Flight.mp4",
+          thumb:
+            "https://d3hske9hd2ghod.cloudfront.net/experiences/thumbnails/b959de8f-dd5e-44a1-b7eb-8bbc5573467f-Alpha Helicopter Flight.mp4.jpg",
+          type: "exp",
+          status: "upcoming",
+          time: "Saturday • 10:00 AM",
+        },
+        {
+          id: "lVHJn6KUzlqJqbHygYta",
+          title: "Summit Experience",
+          price: 81.78,
+          city: "New York",
+          lat: 40.7527788,
+          lng: -73.978735,
+          video:
+            "https://d3hske9hd2ghod.cloudfront.net/converted/experiences/8be4ff0d-5533-4c1a-9558-dc0b478cecbb-Summit One Vanderbilt.mp4",
+          thumb:
+            "https://d3hske9hd2ghod.cloudfront.net/experiences/thumbnails/f0e48b96-22e3-457e-8268-4fa4a0d72b82-Summit One Vanderbilt.mp4.jpg",
+          type: "exp",
+          status: "today",
+          time: "2:30 PM",
+        },
+        {
+          id: "hQLcOk1YZ5nEFcCYCWCt",
+          title: "Paint-in-the-Dark X Live DJ Workshop",
+          price: 101.52,
+          city: "Long Island City",
+          lat: 40.7475088,
+          lng: -73.95074869999999,
+          video:
+            "https://d3hske9hd2ghod.cloudfront.net/converted/experiences/4f23994f-6294-4303-9931-ff7646e48fff-AQNkI-myDyiFMlwUopAxh9LQZNdq78Q-Ayg59kaI8mxQ5fSI_93V4idMqU5woivnQwvks0sZ-dlFhgmUpUX8fUHHG8f7n8Tf15fENq8.mp4",
+          thumb:
+            "https://d3hske9hd2ghod.cloudfront.net/experiences/thumbnails/07f19d62-5a0c-4c3e-9af0-32533e3ac880-AQNkI-myDyiFMlwUopAxh9LQZNdq78Q-Ayg59kaI8mxQ5fSI_93V4idMqU5woivnQwvks0sZ-dlFhgmUpUX8fUHHG8f7n8Tf15fENq8.mp4.jpg",
+          type: "evt",
+          status: "upcoming",
+          time: "Friday • 8:00 PM",
+        },
+        {
+          id: "Uc1F02MnKajkmZ7etAIc",
+          title: "Museum of Modern Arts Tour",
+          price: 70.5,
+          city: "New York",
+          lat: 40.76134920000001,
+          lng: -73.9773325,
+          video:
+            "https://d3hske9hd2ghod.cloudfront.net/converted/experiences/7456dd94-390d-47b9-b525-75f625b8f32a-Museum of Modern Arts Tour.mp4",
+          thumb:
+            "https://d3hske9hd2ghod.cloudfront.net/experiences/thumbnails/a05c46a2-f726-465f-a4dc-f13267bb84a8-Museum of Modern Arts Tour.mp4.jpg",
+          type: "evt",
+          status: "today",
+          time: "1:30 PM",
+        },
+        {
+          id: "GZTuzXlPY00n6ii4Ytu9",
+          title: "Golden Hour Cocktail Sail aboard Clipper City Tall Ship",
+          price: 118.44,
+          city: "New York",
+          lat: 40.7058556,
+          lng: -74.00192799999999,
+          video:
+            "https://d3hske9hd2ghod.cloudfront.net/converted/experiences/e21c8a3e-28f5-45d7-b568-374b9f0f50a6-CC Daytime Sail Crowd.mp4",
+          thumb:
+            "https://d3hske9hd2ghod.cloudfront.net/experiences/thumbnails/0af55501-324b-4589-87d0-f85dad7fa7ef-CC Daytime Sail Crowd.mp4.jpg",
+          type: "exp",
+          status: "upcoming",
+          time: "Sunday • 6:00 PM",
+        },
+        {
+          id: "qaCZv2wOxcp8OFZChL93",
+          title: "Evening Wine and Jazz Sail Aboard the Clipper City Tall Ship",
+          price: 191.76,
+          city: "New York",
+          lat: 40.7054623,
+          lng: -74.0016428,
+          video:
+            "https://d3hske9hd2ghod.cloudfront.net/converted/experiences/1d81adc8-95db-4a2f-946d-2228e20f5188-Sunset Jazz 1 (1).mp4",
+          thumb:
+            "https://d3hske9hd2ghod.cloudfront.net/experiences/thumbnails/e704a551-c414-4fff-96e2-f1fa73dd29e1-Sunset Jazz 1 (1).mov.jpg",
+          type: "exp",
+          status: "today",
+          time: "7:30 PM",
+        },
+        {
+          id: "IitizUjUD7LDgzlMIu5u",
+          title: "DIY Empire Building Lamp",
+          price: 83.19,
+          city: "Long Island City",
+          lat: 40.7475088,
+          lng: -73.95074869999999,
+          video:
+            "https://d3hske9hd2ghod.cloudfront.net/converted/experiences/6b8ba3a9-9943-4da2-80c1-00d407a9a85c-AQOuJzEW3sld6W_EjNq0ieUudBWMiysSRYygdyLhJ3MraqJ3tOAwJ64Sv-yl-W8R4Ptajet9zS_RmF1C-XngCiIUlfQW-djCI3be27g.mp4",
+          thumb:
+            "https://d3hske9hd2ghod.cloudfront.net/experiences/thumbnails/12fa4f19-9219-4f89-9b23-f20082bee146-AQOuJzEW3sld6W_EjNq0ieUudBWMiysSRYygdyLhJ3MraqJ3tOAwJ64Sv-yl-W8R4Ptajet9zS_RmF1C-XngCiIUlfQW-djCI3be27g.mp4.jpg",
+          type: "exp",
+          status: "upcoming",
+          time: "Thursday • 5:00 PM",
+        },
+        {
+          id: "310X59F9wuWymk9ihsMR",
+          title: "Sip,Paint & Slime-in-the-Dark",
+          price: 81.78,
+          city: "Long Island City",
+          lat: 40.7475088,
+          lng: -73.95074869999999,
+          video:
+            "https://d3hske9hd2ghod.cloudfront.net/converted/experiences/d606c38c-9f0c-4697-879d-470e40d3ea5a-AQOLPVKk8bnnie6hGHPLta61SVx0-obIHB_h9_TqSX2Oii-nynpBJ01wjFjQtXU0U0eypeYiOzea9uwBpXGHQUhjg2gW12tKhHEtTsI.mp4",
+          thumb:
+            "https://d3hske9hd2ghod.cloudfront.net/experiences/thumbnails/b1310ffa-4196-4b22-8575-8d397b8e8647-AQOLPVKk8bnnie6hGHPLta61SVx0-obIHB_h9_TqSX2Oii-nynpBJ01wjFjQtXU0U0eypeYiOzea9uwBpXGHQUhjg2gW12tKhHEtTsI.mp4.jpg",
+          type: "evt",
+          status: "today",
+          time: "6:00 PM",
+        },
+        {
+          id: "p7hawoEVCoaY3ByhqL2Z",
+          title: "Central Park Yoga Class",
+          price: 38.07,
+          city: "New York",
+          lat: 40.7987768,
+          lng: -73.9537196,
+          video:
+            "https://d3hske9hd2ghod.cloudfront.net/converted/experiences/1505d730-5849-4add-9c71-d91e968c8168-Yoga in Central Park.mp4",
+          thumb:
+            "https://d3hske9hd2ghod.cloudfront.net/experiences/thumbnails/9ef66faa-0c44-402c-bd32-9dad20d312fc-Yoga in Central Park.mp4.jpg",
+          type: "evt",
+          status: "upcoming",
+          time: "Wednesday • 7:00 AM",
+        },
+        {
+          id: "K1SxEPAewZxZddEJgfYB",
+          title: "Rockaway Beach Group Surf Lesson",
+          price: 112.8,
+          city: "Neponsit",
+          lat: 40.5722132,
+          lng: -73.8624893,
+          video:
+            "https://d3hske9hd2ghod.cloudfront.net/converted/experiences/f1bc0c2f-7e29-4c2d-82f1-8c91edecfa5e-Rockaway Beach Group Surf Lesson.mp4",
+          thumb:
+            "https://d3hske9hd2ghod.cloudfront.net/experiences/thumbnails/433aa7f0-944b-49db-83fd-edbd08114827-Rockaway Beach Group Surf Lesson.mp4.jpg",
+          type: "exp",
+          status: "today",
+          time: "8:00 AM",
+        },
+        {
+          id: "LC3zQtspbKUTawkXV5IL",
+          title: "Candle Making Class",
+          price: 70.5,
+          city: "New York City",
+          lat: 40.712391,
+          lng: -74.004758,
+          video:
+            "https://d3hske9hd2ghod.cloudfront.net/converted/experiences/11451f9d-7ad4-455d-bfe0-40b9766dca24-Candle Making Class.mp4",
+          thumb:
+            "https://d3hske9hd2ghod.cloudfront.net/experiences/thumbnails/0ff67e58-99d6-40c3-b2fa-3b7cdb8c8e1a-Candle Making Class.mp4.jpg",
+          type: "evt",
+          status: "upcoming",
+          time: "Saturday • 4:00 PM",
+        },
+        {
+          id: "7ISBEtuJVDUCmSAxiOq1",
+          title: "Owen's Eco-Canoe Tour ",
+          price: 105.75,
+          city: "Regional Municipality of Niagara",
+          lat: 43.1632265,
+          lng: -79.3216142,
+          video:
+            "https://d3hske9hd2ghod.cloudfront.net/converted/experiences/96453791-bd5b-4952-923f-cf748d5e2e97-ECO-CANOE TOUR ($75 per person, $85 if Private) Option 2.mp4",
+          thumb:
+            "https://d3hske9hd2ghod.cloudfront.net/experiences/thumbnails/23126dee-6a6a-4e37-9bea-b6d173d1f566-ECO-CANOE TOUR ($75 per person, $85 if Private) Option 2.mp4.jpg",
+          type: "evt",
+          status: "today",
+          time: "1:00 PM",
+        },
+        {
+          id: "jokUdmBJ124k3IsDez56",
+          title: "INDIGENOUS CULTURAL EXPERIENCE ",
+          price: 77.55,
+          city: "Niagara Falls",
+          lat: 43.0548857,
+          lng: -79.1326272,
+          video:
+            "https://d3hske9hd2ghod.cloudfront.net/converted/experiences/41d67096-c9a2-4ce0-980b-82f163840c8d-Corporate Cultural Retreat-2.mp4",
+          thumb:
+            "https://d3hske9hd2ghod.cloudfront.net/experiences/thumbnails/0c3faade-5220-4433-b88b-5a353b140bfa-Corporate Cultural Retreat-2.mp4.jpg",
+          type: "exp",
+          status: "upcoming",
+          time: "Monday • 11:00 AM",
+        },
+        {
+          id: "tI8NPZyzozUGWegRJXr1",
+          title: "Puppies & Pastries",
+          price: 42.3,
+          city: "Toronto",
+          lat: 43.6492763,
+          lng: -79.39727859999999,
+          video:
+            "https://d3hske9hd2ghod.cloudfront.net/converted/experiences/5b095c71-6140-4f32-858e-39b04731b4a7-2d91ae6d55a04a53a4bd4fe6362290d0 2.mp4",
+          thumb:
+            "https://d3hske9hd2ghod.cloudfront.net/experiences/thumbnails/Screenshot+2025-07-03+125309.png",
+          type: "exp",
+          status: "today",
+          time: "10:00 AM",
+        },
+        {
+          id: "1AAlzOvI6V4j2V4ubvTi",
+          title: "Bata Shoe Museum",
+          price: 25.38,
+          city: "Toronto",
+          lat: 43.667267,
+          lng: -79.4000689,
+          video:
+            "https://d3hske9hd2ghod.cloudfront.net/converted/experiences/ca404096-7b3c-4d59-bab3-f1c2bc7ce16a.mp4",
+          thumb:
+            "https://d3hske9hd2ghod.cloudfront.net/experiences/thumbnails/bac822df-8acf-487a-b8d1-4311fb4188a7.jpg",
+          type: "evt",
+          status: "upcoming",
+          time: "Tuesday • 12:00 PM",
+        },
+        {
+          id: "UvMZU1hpVTIbCnDBBQ0x",
+          title: "Reids Cocktail Class",
+          price: 91.65,
+          city: "Toronto",
+          lat: 43.65554119999999,
+          lng: -79.34054760000001,
+          video:
+            "https://d3hske9hd2ghod.cloudfront.net/converted/experiences/e4b6c341-3180-4fab-ae46-6809c388727f.mp4",
+          thumb:
+            "https://d3hske9hd2ghod.cloudfront.net/experiences/thumbnails/asssssssssssssssssssssssssssssssssssssss.png",
+          type: "evt",
+          status: "today",
+          time: "5:00 PM",
+        },
+        {
+          id: "IqokG1W3yaAFmZc9kCI4",
+          title: "Tiki Bar Boat Cruise",
+          price: 133.95,
+          city: "Toronto",
+          lat: 43.63793,
+          lng: -79.38743,
+          video:
+            "https://d3hske9hd2ghod.cloudfront.net/converted/experiences/b25a7e1f-e715-45b4-8532-eb9d10e09fa1.mp4",
+          thumb:
+            "https://d3hske9hd2ghod.cloudfront.net/experiences/thumbnails/91a52b65-4237-40a7-bf5f-01e2c81fde70.jpg",
+          type: "exp",
+          status: "upcoming",
+          time: "Sunday • 3:00 PM",
+        },
+        {
+          id: "U7sRQCyOKkrMcs9HHVe9",
+          title: "An Immersive Gaming Experience",
+          price: 49.35,
+          city: "Toronto",
+          lat: 43.7295301,
+          lng: -79.28426549999999,
+          video:
+            "https://d3hske9hd2ghod.cloudfront.net/converted/experiences/aef126e3-76da-48cc-b545-05c4b11ce486.mp4",
+          thumb:
+            "https://d3hske9hd2ghod.cloudfront.net/experiences/thumbnails/f2c0d4c0-1add-4bf1-aa41-747579bac1ef.jpg",
+          type: "exp",
+          status: "today",
+          time: "2:00 PM",
+        },
+        {
+          id: "TZyS5b0tII4BNw6v5tw7",
+          title: "Custom Silver Ring Workshop",
+          price: 169.2,
+          city: "Toronto",
+          lat: 43.6437006,
+          lng: -79.4053764,
+          video:
+            "https://d3hske9hd2ghod.cloudfront.net/converted/experiences/5f69eb86-6f6d-466c-899d-4d4b19622a7f.mp4",
+          thumb:
+            "https://d3hske9hd2ghod.cloudfront.net/experiences/thumbnails/Scr101837.png",
+          type: "evt",
+          status: "upcoming",
+          time: "Friday • 4:00 PM",
+        },
+        {
+          id: "aqvkdrK3PzHsewoVdx6S",
+          title: "Casa Loma ",
+          price: 67.68,
+          city: "Toronto",
+          lat: 43.67804230000001,
+          lng: -79.4094106,
+          video:
+            "https://d3hske9hd2ghod.cloudfront.net/converted/experiences/e3920e2a-a447-4565-bda2-20ede53d3c6b.mp4",
+          thumb:
+            "https://d3hske9hd2ghod.cloudfront.net/experiences/thumbnails/9a802644-3b27-4c61-9809-cd5c5ce3cee8.jpg",
+          type: "exp",
+          status: "today",
+          time: "11:30 AM",
+        },
+        {
+          id: "sPjfemy4svJLabqzkKPw",
+          title: "Medeival Times Dinner & Tournament",
+          price: 119.85,
+          city: "Toronto",
+          lat: 43.63259559999999,
+          lng: -79.42555349999999,
+          video:
+            "https://d3hske9hd2ghod.cloudfront.net/converted/experiences/7fdf63e2-b62c-40f7-b1aa-985f9adda9e5.mp4",
+          thumb:
+            "https://d3hske9hd2ghod.cloudfront.net/experiences/thumbnails/4b78210d-9d48-449c-88ac-3073d9f2450f.jpg",
+          type: "evt",
+          status: "upcoming",
+          time: "Saturday • 7:00 PM",
+        },
+        {
+          id: "zRORVIcgyTt1Yoh16KPF",
+          title: "Ripley's Aquarium of Canada",
+          price: 70.5,
+          city: "Toronto",
+          lat: 43.6423802,
+          lng: -79.3860438,
+          video:
+            "https://d3hske9hd2ghod.cloudfront.net/converted/experiences/f6333d21-3b50-4e2c-a230-b8fa7089bb7f.mp4",
+          thumb:
+            "https://d3hske9hd2ghod.cloudfront.net/experiences/thumbnails/ade94a7d-3ffc-498d-a421-77b986c59ac8.jpg",
+          type: "exp",
+          status: "today",
+          time: "12:30 PM",
+        },
+        {
+          id: "GVAkPhOsBpXrHua0BNdK",
+          title: "Sweet Dreams Paint Night",
+          price: 73.32,
+          city: "Mississauga",
+          lat: 43.6363705,
+          lng: -79.62310200000002,
+          video:
+            "https://d3hske9hd2ghod.cloudfront.net/converted/experiences/6999d3ed-7cb6-4bad-9606-8107f15ad1dd.mp4",
+          thumb:
+            "https://d3hske9hd2ghod.cloudfront.net/experiences/thumbnails/52cade3c-d323-4d34-8ee3-934283b33cf5.jpg",
+          type: "evt",
+          status: "upcoming",
+          time: "Thursday • 7:00 PM",
+        },
+        {
+          id: "TxAZbYbXCB5j5tpnSky2",
+          title: "Neon Splatter Workshop",
+          price: 14.1,
+          city: "Toronto",
+          lat: 43.6543046,
+          lng: -79.39261920000001,
+          video:
+            "https://d3hske9hd2ghod.cloudfront.net/converted/experiences/22fea9dc-15ea-4a20-a41d-41ab4eb7089d.mp4",
+          thumb:
+            "https://d3hske9hd2ghod.cloudfront.net/experiences/thumbnails/fe331616-38cb-4d61-a2de-5ce0dc471656.jpg",
+          type: "evt",
+          status: "today",
+          time: "3:30 PM",
+        },
+        {
+          id: "vbckwA9Jcjrk9rWE9JCz",
+          title: "Classic Candle Making Lab",
+          price: 133.95,
+          city: "Toronto",
+          lat: 43.6722325,
+          lng: -79.3959603,
+          video:
+            "https://d3hske9hd2ghod.cloudfront.net/converted/experiences/964111ac-a319-4b9b-bb71-b777aecdef29.mp4",
+          thumb:
+            "https://d3hske9hd2ghod.cloudfront.net/experiences/thumbnails/1f5fd8f8-8f20-46af-80a9-e95db877be1d.jpg",
+          type: "evt",
+          status: "upcoming",
+          time: "Wednesday • 6:00 PM",
+        },
+        {
+          id: "TSURl2PK2MOJC5qLriLZ",
+          title: "Whisk It Up: The Art of Matcha Making",
+          price: 121.26,
+          city: "Toronto",
+          lat: 43.6583349,
+          lng: -79.4004685,
+          video:
+            "https://d3hske9hd2ghod.cloudfront.net/converted/experiences/b5f96fc6-275a-457d-81d2-dce097a548c2.mp4",
+          thumb:
+            "https://d3hske9hd2ghod.cloudfront.net/experiences/thumbnails/49265112-54da-43c7-aaa4-4c7a030d3976.jpg",
+          type: "exp",
+          status: "today",
+          time: "1:00 PM",
+        },
+        {
+          id: "02XYY9EhTWXm984vG02l",
+          title: "Royal Ontario Museum General Admission",
+          price: 35.25,
+          city: "Toronto",
+          lat: 43.6677097,
+          lng: -79.3947771,
+          video:
+            "https://d3hske9hd2ghod.cloudfront.net/converted/experiences/289d7f37-b251-4ef0-b334-60d884f38f4e.mp4",
+          thumb:
+            "https://d3hske9hd2ghod.cloudfront.net/experiences/thumbnails/da6a6cb3-81de-4ebc-8290-22a590bf7491.jpg",
+          type: "evt",
+          status: "upcoming",
+          time: "Friday • 10:00 AM",
+        },
+      ];
+
+      // ------- STATE -------
+      let activeTypeFilter = "all";
+      let map;
+      const markerMap = {};
+      let summaryModeIndex = 0;
+      let summaryInterval;
+      let isMobile = false;
+      let videoObserver;
+      let cardObserver;
+      let isVideoMode = false;
+
+      // ------- INIT -------
+      document.addEventListener("DOMContentLoaded", () => {
+        initMap();
+        renderCardList(); // Start with card list for "All"
+        startSummaryRotator();
+        setupCardObserver();
+        checkMobile();
+      });
+
+      function checkMobile() {
+        isMobile = window.innerWidth <= 900;
+      }
+
+      window.addEventListener("resize", () => {
+        checkMobile();
+      });
+
+      function initMap() {
+        map = L.map("map", { zoomControl: false }).setView([40.73, -73.98], 11);
+        L.tileLayer(
+          "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
+          {
+            attribution: "",
+          }
+        ).addTo(map);
+
+        // Add custom map controls
+        addMapControls();
+
+        // add markers - initially all
+        renderMarkers();
+
+        map.on("moveend", () => {
+          updateSummaryForBounds();
+        });
+
+        // Close popups when clicking on map
+        map.on("click", () => {
+          closeAllPopups();
+        });
+      }
+
+      function closeAllPopups() {
+        document.querySelectorAll(".marker-cluster").forEach((cluster) => {
+          cluster.dataset.expanded = "false";
+          cluster.classList.remove("expanded");
+        });
+      }
+
+      // ------- NEARBY LOCATION FEATURE -------
+      function calculateDistance(lat1, lon1, lat2, lon2) {
+        const R = 6371; // Earth's radius in km
+        const dLat = ((lat2 - lat1) * Math.PI) / 180;
+        const dLon = ((lon2 - lon1) * Math.PI) / 180;
+        const a =
+          Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+          Math.cos((lat1 * Math.PI) / 180) *
+            Math.cos((lat2 * Math.PI) / 180) *
+            Math.sin(dLon / 2) *
+            Math.sin(dLon / 2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return R * c;
+      }
+
+      function getNearbyExperiences(userLat, userLng, radiusKm = 10) {
+        return experiences.filter((exp) => {
+          const distance = calculateDistance(
+            userLat,
+            userLng,
+            exp.lat,
+            exp.lng
+          );
+          return distance <= radiusKm;
+        });
+      }
+
+      // Function to get user location and show nearby
+      let userLocation = null;
+
+      function requestUserLocation() {
+        if ("geolocation" in navigator) {
+          navigator.geolocation.getCurrentPosition(
+            (position) => {
+              userLocation = {
+                lat: position.coords.latitude,
+                lng: position.coords.longitude,
+              };
+              console.log("User location:", userLocation);
+            },
+            (error) => {
+              console.log("Geolocation error:", error);
+            }
+          );
+        }
+      }
+
+      // Request location on page load
+      requestUserLocation();
+
+      // Group experiences by city/location
+      function groupByLocation(items) {
+        const groups = {};
+
+        items.forEach((item) => {
+          // Group by city name instead of coordinates
+          const key = item.city.toLowerCase().trim();
+
+          if (!groups[key]) {
+            groups[key] = {
+              lat: item.lat,
+              lng: item.lng,
+              city: item.city,
+              items: [],
+            };
+          }
+          groups[key].items.push(item);
+        });
+
+        return Object.values(groups);
+      }
+
+      function renderMarkers() {
+        // Remove existing markers
+        Object.values(markerMap).forEach((marker) => map.removeLayer(marker));
+
+        // Clear marker map
+        for (let key in markerMap) {
+          delete markerMap[key];
+        }
+
+        // Get filtered experiences based on active tab
+        const filtered = getFiltered();
+
+        // Group by location
+        const locationGroups = groupByLocation(filtered);
+
+        // Add markers for each location group
+        locationGroups.forEach((group) => {
+          if (group.items.length === 1) {
+            // Single item - show regular marker
+            const item = group.items[0];
+            createSingleMarker(item);
+          } else {
+            // Multiple items - show cluster marker
+            createClusterMarker(group);
+          }
+        });
+      }
+
+      function createSingleMarker(item) {
+        const emoji = item.type === "exp" ? "❤️" : "⭐";
+        const html = `
+      <div class="marker-dot filtered" id="marker-${item.id}" data-expanded="false">
+        <span class="emoji">${emoji}</span>
+        <div class="marker-popup">
+          <div class="marker-popup-title">${item.title}</div>
+          <span class="marker-popup-price">$${item.price}</span>
+          <a href="/experience/${item.id}" class="marker-popup-btn" onclick="event.stopPropagation(); viewDetails('${item.id}'); return false;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+              <circle cx="12" cy="12" r="3"></circle>
+            </svg>
+            <span>View</span>
+          </a>
+        </div>
+      </div>
+    `;
+        const icon = L.divIcon({
+          className: "",
+          html,
+          iconSize: [40, 40],
+          iconAnchor: [20, 20],
+        });
+
+        const marker = L.marker([item.lat, item.lng], { icon }).addTo(map);
+        markerMap[item.id] = marker;
+
+        marker.on("click", () => {
+          focusItem(item.id, { from: "marker" });
+        });
+      }
+
+      function createClusterMarker(group) {
+        // Check if we're in live mode and group has live users
+        const hasLiveItems = group.items.some((item) => item.isLive);
+
+        if (hasLiveItems && activeTypeFilter === "live") {
+          // Show user avatars instead of cluster icon
+          createLiveUserMarkers(group);
+          return;
+        }
+
+        const groupId = `cluster-${group.lat}-${group.lng}`;
+        // Use first item's thumbnail as cluster image
+        const clusterImage = group.items[0].thumb;
+
+        const html = `
+      <div class="marker-cluster" id="${groupId}" data-expanded="false">
+        <div class="cluster-icon-image">
+          <img src="${clusterImage}" alt="${
+          group.city
+        }" class="cluster-thumbnail" />
+          <span class="cluster-count-badge">${group.items.length}</span>
+        </div>
+        <div class="cluster-label">${group.city}</div>
+        <div class="cluster-popup" id="popup-${groupId}">
+          <div class="cluster-popup-header">
+            <strong>${group.city}</strong>
+            <span>${group.items.length} experiences</span>
+          </div>
+          <div class="cluster-popup-list">
+            ${group.items
+              .map(
+                (item) => `
+              <div class="cluster-item" data-id="${item.id}">
+                <span class="cluster-item-emoji">${
+                  item.type === "exp" ? "❤️" : "⭐"
+                }</span>
+                <div class="cluster-item-info">
+                  <div class="cluster-item-title">${item.title}</div>
+                  <div class="cluster-item-price">$${item.price}</div>
+                </div>
+              </div>
+            `
+              )
+              .join("")}
+          </div>
+        </div>
+      </div>
+    `;
+
+        const icon = L.divIcon({
+          className: "",
+          html,
+          iconSize: [60, 80],
+          iconAnchor: [30, 40],
+        });
+
+        const marker = L.marker([group.lat, group.lng], { icon }).addTo(map);
+        markerMap[groupId] = marker;
+
+        // Click handler for cluster
+        marker.on("click", (e) => {
+          L.DomEvent.stopPropagation(e);
+
+          // Close all other popups first
+          document.querySelectorAll(".marker-cluster").forEach((cluster) => {
+            if (cluster.id !== groupId) {
+              cluster.dataset.expanded = "false";
+              cluster.classList.remove("expanded");
+            }
+          });
+
+          const clusterEl = document.getElementById(groupId);
+          const isExpanded = clusterEl.dataset.expanded === "true";
+
+          if (!isExpanded) {
+            // Show popup
+            clusterEl.dataset.expanded = "true";
+            clusterEl.classList.add("expanded");
+
+            // Add click handlers to items
+            setTimeout(() => {
+              group.items.forEach((item) => {
+                const itemEl = document.querySelector(
+                  `.cluster-item[data-id="${item.id}"]`
+                );
+                if (itemEl) {
+                  itemEl.onclick = (e) => {
+                    e.stopPropagation();
+                    expandCluster(group, groupId);
+                  };
+                }
+              });
+            }, 100);
+          } else {
+            // Hide popup
+            clusterEl.dataset.expanded = "false";
+            clusterEl.classList.remove("expanded");
+          }
+        });
+      }
+
+      function createLiveUserMarkers(group) {
+        // Get all live items in this group
+        const liveItems = group.items.filter((item) => item.isLive);
+
+        liveItems.forEach((item) => {
+          if (item.liveUsers && item.liveUsers.length > 0) {
+            item.liveUsers.forEach((user, index) => {
+              const offsetLat = index * 0.0005;
+              const offsetLng = index * 0.0005;
+
+              const html = `
+            <div class="live-user-marker" data-item-id="${item.id}">
+              <img src="${user.avatar}" alt="${user.name}" class="user-avatar" />
+              <div class="live-badge">LIVE</div>
+            </div>
+          `;
+
+              const icon = L.divIcon({
+                className: "",
+                html,
+                iconSize: [50, 50],
+                iconAnchor: [25, 25],
+              });
+
+              const marker = L.marker(
+                [group.lat + offsetLat, group.lng + offsetLng],
+                { icon }
+              ).addTo(map);
+
+              markerMap[`${item.id}-user-${index}`] = marker;
+
+              // Click handler to focus on item
+              marker.on("click", () => {
+                focusItem(item.id, { from: "marker" });
+              });
+            });
+          }
+        });
+      }
+
+      function expandCluster(group, clusterId) {
+        // Remove cluster marker
+        if (markerMap[clusterId]) {
+          map.removeLayer(markerMap[clusterId]);
+          delete markerMap[clusterId];
+        }
+
+        // Create individual markers in a circle pattern
+        const radius = 0.002; // Adjust for spread
+        const angleStep = (2 * Math.PI) / group.items.length;
+
+        group.items.forEach((item, index) => {
+          const angle = index * angleStep;
+          const offsetLat = Math.cos(angle) * radius;
+          const offsetLng = Math.sin(angle) * radius;
+
+          const newLat = group.lat + offsetLat;
+          const newLng = group.lng + offsetLng;
+
+          const emoji = item.type === "exp" ? "❤️" : "⭐";
+          const html = `
+        <div class="marker-dot filtered expanded-marker" id="marker-${item.id}" data-expanded="true">
+          <span class="emoji">${emoji}</span>
+          <div class="marker-popup">
+            <div class="marker-popup-title">${item.title}</div>
+            <span class="marker-popup-price">$${item.price}</span>
+            <a href="/experience/${item.id}" class="marker-popup-btn" onclick="event.stopPropagation(); viewDetails('${item.id}'); return false;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                <circle cx="12" cy="12" r="3"></circle>
+              </svg>
+              <span>View</span>
+            </a>
+          </div>
+        </div>
+      `;
+
+          const icon = L.divIcon({
+            className: "",
+            html,
+            iconSize: [40, 40],
+            iconAnchor: [20, 20],
+          });
+
+          const marker = L.marker([newLat, newLng], { icon }).addTo(map);
+          markerMap[item.id] = marker;
+
+          marker.on("click", () => {
+            focusItem(item.id, { from: "marker" });
+          });
+
+          // Animate marker appearance
+          setTimeout(() => {
+            const markerEl = document.getElementById(`marker-${item.id}`);
+            if (markerEl) {
+              markerEl.style.animation = "markerExpand 0.3s ease-out";
+            }
+          }, index * 50);
+        });
+
+        // Zoom in slightly to show spread
+        map.flyTo([group.lat, group.lng], map.getZoom() + 1, { duration: 0.5 });
+      }
+
+      function addMapControls() {
+        const controlsHTML = `
+          <div class="map-controls">
+            <div class="map-control-btn" onclick="map.zoomIn()" title="Zoom In">+</div>
+            <div class="map-control-btn" onclick="map.zoomOut()" title="Zoom Out">−</div>
+            <div class="map-control-btn" onclick="flyToAll()" title="View All">⊙</div>
+          </div>
+        `;
+
+        const controlsDiv = document.createElement("div");
+        controlsDiv.innerHTML = controlsHTML;
+        document
+          .querySelector(".map-wrapper")
+          .appendChild(controlsDiv.firstElementChild);
+      }
+
+      // ------- FILTER + RENDER -------
+      function setTypeFilter(tabEl, type) {
+        activeTypeFilter = type;
+        document.querySelectorAll(".type-tab").forEach((el) => {
+          el.classList.toggle("active", el === tabEl);
+        });
+
+        const feed = document.getElementById("feed");
+        const cardListContainer = document.getElementById(
+          "card-list-container"
+        );
+        const videoFeedContainer = document.getElementById(
+          "video-feed-container"
+        );
+
+        // Re-render markers to show only filtered type with shine
+        renderMarkers();
+
+        if (type === "all") {
+          // Show card list view
+          isVideoMode = false;
+          feed.classList.remove("video-mode");
+          feed.style.scrollSnapType = "none";
+          cardListContainer.classList.add("active");
+          videoFeedContainer.classList.remove("active");
+          renderCardList();
+        } else {
+          // Show video feed view
+          isVideoMode = true;
+          feed.classList.add("video-mode");
+          feed.style.scrollSnapType = "y mandatory";
+          cardListContainer.classList.remove("active");
+          videoFeedContainer.classList.add("active");
+          renderVideoFeed();
+        }
+      }
+
+      function getFiltered() {
+        if (activeTypeFilter === "all") return experiences;
+        if (activeTypeFilter === "live") {
+          return experiences.filter((e) => e.isLive === true);
+        }
+        return experiences.filter((e) => e.type === activeTypeFilter);
+      }
+
+      // ------- CARD LIST VIEW (for "All" tab) -------
+      function renderCardList() {
+        const filtered = getFiltered();
+        const today = filtered.filter((e) => e.status === "today");
+        const upcoming = filtered.filter((e) => e.status === "upcoming");
+
+        renderSection("cards-today", "empty-today", today);
+        renderSection("cards-upcoming", "empty-upcoming", upcoming);
+
+        updateSummaryForBounds();
+        clearActiveMarkers();
+        setupCardObserver();
+      }
+
+      // View All toggle for sections
+      const sectionStates = {
+        today: { expanded: false, limit: 10 },
+        upcoming: { expanded: false, limit: 10 },
+      };
+
+      function toggleViewAll(section) {
+        const state = sectionStates[section];
+        state.expanded = !state.expanded;
+
+        const cardsContainer = document.getElementById(`cards-${section}`);
+        const viewAllLink = document.getElementById(`view-all-${section}`);
+
+        if (state.expanded) {
+          cardsContainer.classList.remove("collapsed");
+          cardsContainer.classList.add("expanded");
+          viewAllLink.textContent = "Show Less";
+        } else {
+          cardsContainer.classList.add("collapsed");
+          cardsContainer.classList.remove("expanded");
+          viewAllLink.textContent = "View All";
+        }
+
+        // Re-render to show all items
+        renderCardList();
+      }
+
+      function renderSection(cardsId, emptyId, data) {
+        const cardsWrap = document.getElementById(cardsId);
+        const empty = document.getElementById(emptyId);
+        cardsWrap.innerHTML = "";
+
+        if (!data.length) {
+          empty.style.display = "block";
+          return;
+        }
+        empty.style.display = "none";
+
+        // Determine which section this is and check if expanded
+        const section = cardsId.replace("cards-", "");
+        const state = sectionStates[section];
+        const displayData =
+          state && !state.expanded ? data.slice(0, state.limit) : data;
+
+        // Hide View All link if items are less than limit
+        const viewAllLink = document.getElementById(`view-all-${section}`);
+        if (viewAllLink && data.length <= state.limit) {
+          viewAllLink.style.display = "none";
+        } else if (viewAllLink) {
+          viewAllLink.style.display = "block";
+        }
+
+        displayData.forEach((item) => {
+          const card = document.createElement("article");
+          card.className = "card";
+          card.id = `card-${item.id}`;
+          card.dataset.id = item.id;
+
+          const typeLabel = item.type === "exp" ? "Experience" : "Event";
+
+          card.innerHTML = `
+            <img class="card-thumb" src="${item.thumb}" alt="${item.title}" />
+            <div class="card-body">
+              <div class="card-label-row">
+                <div class="pill-type">${typeLabel}</div>
+              </div>
+              <div class="card-title">${item.title}</div>
+              <div class="card-meta-row">
+                <div class="card-left-meta">
+                  <div class="chip">
+                    <span class="chip-dot"></span>
+                    <span>${item.city}</span>
+                  </div>
+                  <div class="time">${item.time}</div>
+                </div>
+                <div class="card-right-meta">
+                  <div>
+                    <div class="price">$${item.price}</div>
+                    <div class="time">${
+                      item.type === "exp" ? "Small group" : "Limited spots"
+                    }</div>
+                  </div>
+                  <a href="/experience/${
+                    item.id
+                  }" class="btn-view-details" onclick="viewDetails('${
+            item.id
+          }'); return false;" title="View Details">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                      <circle cx="12" cy="12" r="3"></circle>
+                    </svg>
+                  </a>
+                </div>
+              </div>
+            </div>
+          `;
+
+          card.addEventListener("click", () => {
+            focusItemFromCard(item.id);
+          });
+
+          cardsWrap.appendChild(card);
+        });
+      }
+
+      function setupCardObserver() {
+        if (cardObserver) cardObserver.disconnect();
+
+        const feed = document.getElementById("feed");
+        cardObserver = new IntersectionObserver(
+          (entries) => {
+            const visibleCards = entries
+              .filter((e) => e.isIntersecting)
+              .sort((a, b) => b.intersectionRatio - a.intersectionRatio);
+
+            if (!visibleCards.length) return;
+            const top = visibleCards[0].target;
+            const id = top.dataset.id;
+            if (!id) return;
+
+            const item = experiences.find((e) => e.id === id);
+            if (item) {
+              // Highlight marker
+              clearActiveMarkers();
+              const markerEl = document.getElementById(`marker-${id}`);
+              if (markerEl) {
+                markerEl.classList.add("active");
+              }
+
+              // Update summary
+              updateSummaryForFocus(item);
+            }
+          },
+          {
+            root: feed,
+            threshold: 0.6,
+          }
+        );
+
+        setTimeout(() => {
+          document.querySelectorAll(".card").forEach((card) => {
+            cardObserver.observe(card);
+          });
+        }, 100);
+      }
+
+      function focusItemFromCard(id) {
+        const item = experiences.find((e) => e.id === id);
+        if (!item) return;
+
+        // On mobile, switch to map view first
+        if (window.innerWidth <= 900) {
+          setMobileView("map");
+          // Small delay to let transition happen
+          setTimeout(() => {
+            performMapFocus(item, id);
+          }, 300);
+        } else {
+          performMapFocus(item, id);
+        }
+      }
+
+      function performMapFocus(item, id) {
+        // Fly to location
+        map.flyTo([item.lat, item.lng], 14, { duration: 1 });
+
+        // Highlight marker
+        clearActiveMarkers();
+        const markerEl = document.getElementById(`marker-${id}`);
+        if (markerEl) {
+          markerEl.classList.add("active");
+        }
+
+        // Highlight card
+        document
+          .querySelectorAll(".card")
+          .forEach((c) => c.classList.remove("active"));
+        const cardEl = document.getElementById(`card-${id}`);
+        if (cardEl) {
+          cardEl.classList.add("active");
+        }
+
+        // Update summary
+        updateSummaryForFocus(item);
+      }
+
+      // ------- VIDEO FEED VIEW (for "Experiences" / "Events" tabs) -------
+      function renderVideoFeed() {
+        const filtered = getFiltered();
+        const feedContainer = document.getElementById("video-feed-container");
+        feedContainer.innerHTML = "";
+
+        filtered.forEach((item) => {
+          const videoCard = document.createElement("div");
+          videoCard.className = "video-card";
+          videoCard.id = `video-${item.id}`;
+          videoCard.dataset.id = item.id;
+          videoCard.dataset.lat = item.lat;
+          videoCard.dataset.lng = item.lng;
+
+          const typeLabel = item.type === "exp" ? "Experience" : "Event";
+
+          videoCard.innerHTML = `
+            <video loop muted playsinline poster="${item.thumb}">
+              <source src="${item.video}" type="video/mp4">
+            </video>
+            <div class="video-overlay">
+              <div class="video-content-box">
+                <div class="video-location">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                    <circle cx="12" cy="10" r="3"></circle>
+                  </svg>
+                  ${item.city}
+                </div>
+                <div class="video-host">
+                  <div class="host-avatar">🏢</div>
+                  <div class="host-name">${typeLabel} Host</div>
+                </div>
+                <div class="video-description">
+                  ${item.title}
+                </div>
+                <div class="video-pricing-box">
+                  <div class="pricing-left">
+                    <div class="pricing-title">${item.title}</div>
+                    <div class="pricing-amount">$${item.price}/person</div>
+                    <div class="pricing-duration">${item.time}</div>
+                  </div>
+                  <button class="btn-book">Choose time</button>
+                </div>
+              </div>
+            </div>
+            <div class="video-actions">
+              <div class="action-btn" onclick="toggleLike(this)" title="Like">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+                </svg>
+                <span class="action-label">3</span>
+              </div>
+              <div class="action-btn" title="Comment">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                </svg>
+                <span class="action-label">12</span>
+              </div>
+              <div class="action-btn" title="Share">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="18" cy="5" r="3"></circle>
+                  <circle cx="6" cy="12" r="3"></circle>
+                  <circle cx="18" cy="19" r="3"></circle>
+                  <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
+                  <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
+                </svg>
+                <span class="action-label">20</span>
+              </div>
+              <div class="action-btn" title="Save">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
+                </svg>
+                <span class="action-label">2</span>
+              </div>
+            </div>
+          `;
+
+          feedContainer.appendChild(videoCard);
+        });
+
+        updateSummaryForBounds();
+        clearActiveMarkers();
+        setupVideoObserver();
+      }
+
+      // ------- VIDEO SCROLL SYNC -------
+      function setupVideoObserver() {
+        const feed = document.getElementById("feed");
+
+        if (videoObserver) videoObserver.disconnect();
+
+        videoObserver = new IntersectionObserver(
+          (entries) => {
+            entries.forEach((entry) => {
+              const video = entry.target.querySelector("video");
+              const id = entry.target.getAttribute("data-id");
+              const lat = parseFloat(entry.target.getAttribute("data-lat"));
+              const lng = parseFloat(entry.target.getAttribute("data-lng"));
+
+              if (entry.isIntersecting) {
+                // Play video and mark as active
+                entry.target.classList.add("active");
+                if (video) {
+                  video.play().catch(() => {});
+                }
+
+                // Highlight marker
+                clearActiveMarkers();
+                const markerEl = document.getElementById(`marker-${id}`);
+                if (markerEl) {
+                  markerEl.classList.add("active");
+                }
+
+                // Fly to location on map
+                map.flyTo([lat, lng], 13, { duration: 1, animate: true });
+
+                // Update summary
+                const item = experiences.find((e) => e.id === id);
+                if (item) updateSummaryForFocus(item);
+              } else {
+                entry.target.classList.remove("active");
+                if (video) {
+                  video.pause();
+                }
+              }
+            });
+          },
+          {
+            root: feed,
+            threshold: 0.6,
+          }
+        );
+
+        // Observe all video cards
+        setTimeout(() => {
+          document.querySelectorAll(".video-card").forEach((card) => {
+            videoObserver.observe(card);
+          });
+        }, 100);
+      }
+
+      // ------- FOCUS LOGIC: MARKER -> VIEW -------
+      function focusItem(id, { from } = {}) {
+        const item = experiences.find((e) => e.id === id);
+        if (!item) return;
+
+        // Fly to location
+        map.flyTo([item.lat, item.lng], 13, { duration: 0.8 });
+
+        // Highlight marker
+        clearActiveMarkers();
+        const markerEl = document.getElementById(`marker-${id}`);
+        if (markerEl) {
+          markerEl.classList.add("active");
+        }
+
+        // Update summary
+        updateSummaryForFocus(item);
+
+        if (isVideoMode) {
+          // In video mode, scroll to video
+          const videoEl = document.getElementById(`video-${id}`);
+          if (videoEl && from === "marker") {
+            videoEl.scrollIntoView({ behavior: "smooth", block: "start" });
+          }
+        } else {
+          // In card list mode, scroll to card and highlight it
+          // First, clear all active cards
+          document
+            .querySelectorAll(".card")
+            .forEach((c) => c.classList.remove("active"));
+
+          const cardEl = document.getElementById(`card-${id}`);
+          if (cardEl) {
+            cardEl.classList.add("active");
+            if (from === "marker") {
+              cardEl.scrollIntoView({ behavior: "smooth", block: "center" });
+            }
+          }
+        }
+      }
+
+      function clearActiveMarkers() {
+        document
+          .querySelectorAll(".marker-dot")
+          .forEach((el) => el.classList.remove("active"));
+      }
+
+      // ------- SUMMARY BAR -------
+      function updateSummaryForBounds() {
+        const bounds = map.getBounds();
+        const inView = getFiltered().filter((e) =>
+          bounds.contains([e.lat, e.lng])
+        );
+        const iconEl = document.getElementById("summary-icon");
+        const titleEl = document.getElementById("summary-title");
+        const subEl = document.getElementById("summary-sub");
+
+        if (!inView.length) {
+          iconEl.textContent = "🔍";
+          titleEl.textContent = "No items in view";
+          subEl.textContent = "Pan map or scroll feed";
+          return;
+        }
+
+        const expCount = inView.filter((x) => x.type === "exp").length;
+        const evtCount = inView.filter((x) => x.type === "evt").length;
+
+        iconEl.textContent = inView.length;
+        titleEl.textContent = `${expCount} experiences • ${evtCount} events here`;
+        subEl.textContent = "Scroll feed to explore";
+      }
+
+      function updateSummaryForFocus(item) {
+        const iconEl = document.getElementById("summary-icon");
+        const titleEl = document.getElementById("summary-title");
+        const subEl = document.getElementById("summary-sub");
+
+        iconEl.textContent = item.type === "exp" ? "❤️" : "⭐";
+        titleEl.textContent = item.title;
+        subEl.textContent = `${item.city} • $${item.price}`;
+      }
+
+      function startSummaryRotator() {
+        if (summaryInterval) clearInterval(summaryInterval);
+        summaryInterval = setInterval(() => {
+          const filtered = getFiltered();
+          if (!filtered.length) return;
+
+          const iconEl = document.getElementById("summary-icon");
+          const titleEl = document.getElementById("summary-title");
+          const subEl = document.getElementById("summary-sub");
+
+          const mode = summaryModeIndex % 3;
+          if (mode === 0) {
+            const today = filtered.filter((x) => x.status === "today").length;
+            const upcoming = filtered.filter(
+              (x) => x.status === "upcoming"
+            ).length;
+            iconEl.textContent = "🗺️";
+            titleEl.textContent = `${today} today • ${upcoming} coming up`;
+            subEl.textContent = "All visible on the map";
+          } else if (mode === 1) {
+            const pick = filtered[Math.floor(Math.random() * filtered.length)];
+            iconEl.textContent = "🔥";
+            titleEl.textContent = `Trending: ${pick.title}`;
+            subEl.textContent = `${pick.city} • from $${pick.price}`;
+          } else {
+            const pick = filtered[Math.floor(Math.random() * filtered.length)];
+            iconEl.textContent = "⏰";
+            titleEl.textContent = `Starts soon: ${pick.title}`;
+            subEl.textContent = "Lock your spot before it fills";
+          }
+          summaryModeIndex++;
+        }, 4500);
+      }
+
+      function flyToAll() {
+        const group = L.featureGroup(experiences.map((e) => markerMap[e.id]));
+        map.fitBounds(group.getBounds().pad(0.33));
+      }
+
+      // ------- MOBILE INTERACTIONS -------
+      function setMobileView(view) {
+        const feed = document.getElementById("feed");
+        const btns = document.querySelectorAll(".view-btn");
+
+        btns.forEach((btn, i) => {
+          btn.classList.toggle(
+            "active",
+            (view === "map" && i === 0) || (view === "feed" && i === 1)
+          );
+        });
+
+        // Remove feed-view class
+        feed.classList.remove("feed-view");
+
+        if (view === "feed") {
+          // Show feed full screen
+          feed.classList.add("feed-view");
+        }
+        // Else: show map (default - no class needed)
+      }
+      // ------- LIKE INTERACTION -------
+      function toggleLike(btn) {
+        btn.classList.toggle("liked");
+        const svg = btn.querySelector("svg");
+        if (btn.classList.contains("liked")) {
+          svg.setAttribute("fill", "#ff3b5c");
+          svg.setAttribute("stroke", "#ff3b5c");
+        } else {
+          svg.setAttribute("fill", "none");
+          svg.setAttribute("stroke", "currentColor");
+        }
+      }
+
+      // ------- VIEW DETAILS -------
+      function viewDetails(id) {
+        const item = experiences.find((e) => e.id === id);
+        if (!item) return;
+
+        // Placeholder - redirect to detail page
+        // Replace with your actual detail page URL
+        console.log("Viewing details for:", item.title);
+        alert(
+          `Opening details for:\n\n${item.title}\n${item.city} • $${item.price}\n\nID: ${id}`
+        );
+
+        // Uncomment when you have detail page:
+        // window.location.href = `/experience/${id}`;
+      }
+    </script>
+  </body>
+</html>
